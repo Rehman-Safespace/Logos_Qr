@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { EngineDirectives } from "../types";
-import { KeyRound, ShieldCheck, RefreshCw, Save, Plus, Trash2, HelpCircle } from "lucide-react";
+import { KeyRound, ShieldCheck, RefreshCw, Save, Plus, Trash2, HelpCircle, LogIn, Lock } from "lucide-react";
+import { auth } from "../lib/firebase";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 
 interface ControlPanelProps {
   onDirectivesSaved: (newDirectives: EngineDirectives) => void;
@@ -11,6 +13,35 @@ export default function ControlPanel({ onDirectivesSaved }: ControlPanelProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Handle Google OAuth Admin Clearance
+  const handleGoogleAuth = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      // Auto-unlock if user email matches developer or admin access (e.g. safespace.ch@gmail.com)
+      if (user && user.email === "safespace.ch@gmail.com") {
+        setPasscode("logos_secure"); // Set fallback payload passcode for server compatibility
+        setIsAuthenticated(true);
+        setFeedback({ 
+          type: "success", 
+          message: `Zero-Trust Admin Verified: Licensed to safespace.ch@gmail.com! Clearance level 0o2 Granted.` 
+        });
+      } else {
+        setFeedback({ 
+          type: "error", 
+          message: `Authorization Access Denied: External identity [${user?.email || "unknown"}] is not on the admin security list.` 
+        });
+      }
+    } catch (err: any) {
+      setFeedback({ 
+        type: "error", 
+        message: `Google Popup auth failed: ${err.message || "Ensure browser popups are allowed."}` 
+      });
+    }
+  };
 
   // In-progress edited state
   const [directives, setDirectives] = useState<EngineDirectives>({
@@ -138,24 +169,63 @@ export default function ControlPanel({ onDirectivesSaved }: ControlPanelProps) {
 
       {/* Security Challenge Gate */}
       {!isAuthenticated ? (
-        <form onSubmit={handleUnlock} className="flex flex-col gap-3 max-w-sm">
-          <p className="text-slate-400 text-xs">
-            To edit, overwrite, or add operational logic elements inside this container, authenticate with the system master passcode (Default: <strong className="text-amber-500">logos_secure</strong>):
+        <form onSubmit={handleUnlock} className="flex flex-col gap-3.5 max-w-xl">
+          <p className="text-slate-400 text-xs leading-relaxed">
+            To edit, overwrite, or add operational logic elements inside this container, authenticate with the system master passcode (Default: <strong className="text-amber-500">logos_secure</strong>), or instantly verify using your Google Workspace Admin account:
           </p>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              placeholder="Enter system passcode..."
-              value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
-              className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-amber-500"
-            />
-            <button
-              type="submit"
-              className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-sans text-xs px-4 py-1.5 rounded font-bold transition-all"
-            >
-              Sign In
-            </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 flex gap-2">
+              <input
+                type="password"
+                placeholder="Enter system passcode..."
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-amber-500"
+              />
+              <button
+                type="submit"
+                className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-sans text-xs px-4 py-1.5 rounded font-bold transition-all shrink-0"
+              >
+                Sign In
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-500 font-mono font-semibold uppercase sm:px-2">OR</span>
+              <button
+                type="button"
+                onClick={handleGoogleAuth}
+                className="flex items-center justify-center gap-1.5 bg-indigo-950/85 hover:bg-indigo-900 border border-indigo-700/50 hover:border-indigo-500 text-indigo-300 font-sans text-xs px-4 py-2 rounded font-semibold transition-all w-full sm:w-auto shrink-0"
+              >
+                <LogIn className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Verify Admin Identity</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 bg-[#0a0f24] border border-slate-900 rounded-md p-4 space-y-3">
+            <span className="text-xs font-bold text-amber-500 flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-amber-400" />
+              <span>How can I add authentication for information & directives? (Security Blueprint)</span>
+            </span>
+            <div className="text-[11px] text-slate-400 space-y-2 leading-relaxed font-sans">
+              <p>
+                To secure linguistic instruction matrices and directive sets from unauthorized overrides in production, make sure to apply these key design patterns:
+              </p>
+              <ul className="list-disc list-inside space-y-1.5 text-slate-300 pl-1">
+                <li>
+                  <strong className="text-slate-100">Server Environment Secret Verification:</strong> Instead of hardcoding keys, configure a secure production variable on Google Cloud Run (e.g., <code className="text-emerald-400">process.env.ADMIN_SECURE_PASSCODE</code>) and retrieve it inside <code className="text-slate-300">server.ts</code> dynamically.
+                </li>
+                <li>
+                  <strong className="text-slate-100">Secure JWT Authentication:</strong> Decrypt session tokens (or Firebase ID tokens) on production endpoints using <code className="text-indigo-400">firebase-admin</code>, verifying if the user email claims match <code className="text-emerald-400">safespace.ch@gmail.com</code>.
+                </li>
+                <li>
+                  <strong className="text-slate-100">Database Role-Based Locks:</strong> Protect directories in Cloud Firestore by enforcing secure rules restricts:
+                  <pre className="text-[10px] text-indigo-300 bg-slate-950 p-1.5 rounded border border-slate-900 mt-1 overflow-x-auto leading-normal">
+                    {"allow write: if request.auth.token.email == 'safespace.ch@gmail.com';"}
+                  </pre>
+                </li>
+              </ul>
+            </div>
           </div>
         </form>
       ) : (

@@ -34,6 +34,7 @@ export interface DeconstructionNode {
     found: boolean;
     verbatimVerse?: string;
     sourceFile?: string;
+    relevanceScore?: number;
   };
   deepDeduction?: string;
   

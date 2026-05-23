@@ -26,29 +26,221 @@ import {
   Plus,
   Cloud,
   Brain,
-  BrainCircuit
+  BrainCircuit,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Minimize2,
+  Maximize2,
+  Mic,
+  MicOff,
+  Activity,
+  GitBranch,
+  Globe,
+  FileText,
+  Sliders
 } from "lucide-react";
+import RootRelationshipGraph from "./components/RootRelationshipGraph";
 
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [activeGraphDeconstruction, setActiveGraphDeconstruction] = useState<any>(null);
   const [currentMode, setCurrentMode] = useState<Mode>(Mode.WORD_DECONSTRUCTION);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [strictNullProtocol, setStrictNullProtocol] = useState(false);
+  const [strictNullProtocol, setStrictNullProtocol] = useState<boolean>(() => {
+    const saved = localStorage.getItem("logos_strict_null_protocol");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("logos_strict_null_protocol", JSON.stringify(strictNullProtocol));
+  }, [strictNullProtocol]);
+
   const [activityLevel, setActivityLevel] = useState<"idle" | "searching" | "analyzing" | "completed">("idle");
   const [activeTab, setActiveTab] = useState<"workspace" | "null-protocol" | "google-workspace" | "directives">("workspace");
   const [ttsVoice, setTtsVoice] = useState<string>("Kore");
   const [isPlayingId, setIsPlayingId] = useState<string | null>(null);
-  const [isThrottled, setIsThrottled] = useState(false);
+  const [autoVocalize, setAutoVocalize] = useState<boolean>(() => {
+    const saved = localStorage.getItem("logos_auto_vocalize");
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("logos_auto_vocalize", JSON.stringify(autoVocalize));
+  }, [autoVocalize]);
+
+  const [quotaRpm, setQuotaRpm] = useState<number>(30);
+  const [currentLoadCount, setCurrentLoadCount] = useState<number>(1);
+
+  // Decay load count over time to simulate a floating window usage
+  useEffect(() => {
+    const t = setInterval(() => {
+      setCurrentLoadCount(prev => Math.max(0, prev - 1));
+    }, 12000);
+    return () => clearInterval(t);
+  }, []);
   
   // High Thinking model toggle & Memory Directives dynamic injections
   const [useHighThinkingModel, setUseHighThinkingModel] = useState(true); // Default to high thinking reasoning model!
+  const [forceEnglish, setForceEnglish] = useState<boolean>(() => {
+    const saved = localStorage.getItem("logos_force_english");
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("logos_force_english", JSON.stringify(forceEnglish));
+  }, [forceEnglish]);
+
   const [memoryDirectives, setMemoryDirectives] = useState<string[]>([]);
+
+  // Relaxed mode & Collapsible views
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem("logos_sidebar_collapsed");
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [isGuideCollapsed, setIsGuideCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem("logos_guide_collapsed");
+    return saved !== null ? JSON.parse(saved) : true; // Default collapsed to maintain a relaxed environment
+  });
+  const [isDiagnosticsCollapsed, setIsDiagnosticsCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem("logos_diagnostics_collapsed");
+    return saved !== null ? JSON.parse(saved) : true; // Default collapsed to maintain clean layout
+  });
+  const [isMetricsCollapsed, setIsMetricsCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem("logos_metrics_collapsed");
+    return saved !== null ? JSON.parse(saved) : false; // Default visible for pristine status visibility
+  });
+
+  useEffect(() => {
+    localStorage.setItem("logos_sidebar_collapsed", JSON.stringify(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem("logos_metrics_collapsed", JSON.stringify(isMetricsCollapsed));
+  }, [isMetricsCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem("logos_guide_collapsed", JSON.stringify(isGuideCollapsed));
+  }, [isGuideCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem("logos_diagnostics_collapsed", JSON.stringify(isDiagnosticsCollapsed));
+  }, [isDiagnosticsCollapsed]);
 
   // Dynamic selector state variables
   const [mountedDocs, setMountedDocs] = useState<ReferenceDocument[]>([]);
   const [isMatchInDocs, setIsMatchInDocs] = useState(false);
   const [matchDetails, setMatchDetails] = useState<{ docName: string; text: string } | null>(null);
+
+  // Browser Voice Typing Speech Recognition System
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice speech recognition is currently not supported in your browser. Please try using Chrome, Edge, or Safari.");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    recognitionRef.current = rec;
+    rec.continuous = false;
+    rec.interimResults = false;
+    // Set language: Arabic for Word Deconstruction, English/Latin for Root Generation
+    rec.lang = currentMode === Mode.WORD_DECONSTRUCTION ? "ar-SA" : "en-US";
+
+    rec.onstart = () => {
+      setIsListening(true);
+    };
+
+    rec.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      if (transcript) {
+        // Clean out any trailing punctuation if needed
+        setInputText(transcript);
+      }
+    };
+
+    rec.onerror = (err: any) => {
+      console.warn("Speech recognition error captured:", err);
+      setIsListening(false);
+    };
+
+    rec.onend = () => {
+      setIsListening(false);
+    };
+
+    try {
+      rec.start();
+    } catch (e) {
+      console.error("Failed to start speech recording:", e);
+      setIsListening(false);
+    }
+  };
+
+  // Diagnostics and System Verification states
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [diagnosticReport, setDiagnosticReport] = useState<any>(null);
+  const [expandedSystemIds, setExpandedSystemIds] = useState<string[]>([]);
+
+  const runEngineDiagnostics = async () => {
+    setIsDiagnosing(true);
+    setDiagnosticReport(null);
+    
+    // Detect frontend local timezone settings
+    const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let locationName = "Locale Default";
+    
+    try {
+      // Dynamic location fetch using trusted public IP geocoding service
+      const geoRes = await fetch("https://ipapi.co/json/");
+      if (geoRes.ok) {
+        const geoData = await geoRes.json();
+        if (geoData.city && geoData.country_name) {
+          locationName = `${geoData.city}, ${geoData.country_name}`;
+        }
+      }
+    } catch (e) {
+      console.log("Browser IP coordinates fetched locally. Falls back safely.", e);
+    }
+
+    try {
+      const res = await fetch("/api/admin/diagnose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          timezone: clientTimezone,
+          locationName: locationName,
+          quotaRpm: quotaRpm,
+          currentLoad: currentLoadCount
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDiagnosticReport(data.report);
+        // Refresh reference list so the newly saved diagnostic report shows up immediately in the Null Protocol Archive!
+        fetchDocuments();
+      } else {
+        alert(data.error || "Failed to execute engine diagnostic check.");
+      }
+    } catch (err) {
+      console.error("Diagnosis endpoint failed:", err);
+      alert("Network error executing engine diagnostics.");
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
 
   // Fetch documents for the dynamic match system
   const fetchDocuments = async () => {
@@ -127,35 +319,58 @@ export default function App() {
     }
   }, [inputText, mountedDocs]);
 
-  // Time tracker for true live diagnostic clock
-  const [currentTime, setCurrentTime] = useState("2026-05-23 19:27:50");
+  // Dynamic localized clock and location geocoding tracker
+  const [localLocation, setLocalLocation] = useState<string>("Detecting Regional Coordinate...");
+  const [localTimezone, setLocalTimezone] = useState<string>(() => {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  });
+  const [currentTime, setCurrentTime] = useState("");
 
   const timelineEndRef = useRef<HTMLDivElement>(null);
 
-  // 1. Initial Learning State (Rule 1: New Chat updates response)
-  const initialLearningState: LearningState = {
-    learnedCount: 42,
-    lastUpdated: "2026-05-23T19:27:50Z",
-    currentSegmentName: "Thermodynamic Etymology of Ancient Semitic Monoliths",
-    nextSegments: [
-      "Genetic Sequencing of Structural Hebrew Roots",
-      "Epistemic Entropy across Indo-European Phonetic Spheroids"
-    ],
-    cumulativeInsights: [
-      "Deconstructed the classical concept of 'Arabic' from an ethnic idiom to a strict physical property: 'Structural Transparency and Material Alignment'.",
-      "Mapped theological terms like 'Haram' directly to thermodynamic closed-sandbox boundary constraints.",
-      "Successfully replaced dual-directional layout friction by establishing a line-by-line bilingual separator, completely isolating RTL Arabic and LTR English parameters."
-    ]
-  };
+  useEffect(() => {
+    const detectRegionGeo = async () => {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.city && data.country_name) {
+            setLocalLocation(`${data.city}, ${data.country_name}`);
+            if (data.timezone) {
+              setLocalTimezone(data.timezone);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Location detection failed, defaulting to browser parameters.", e);
+        setLocalLocation("UTC World Clock");
+      }
+    };
+    detectRegionGeo();
+  }, []);
 
   useEffect(() => {
-    // Generate live clock
-    const interval = setInterval(() => {
-      const now = new Date();
-      setCurrentTime(now.toISOString().replace("T", " ").substring(0, 19) + " UTC");
-    }, 1000);
+    const updateTime = () => {
+      try {
+        const str = new Date().toLocaleString("en-US", {
+          timeZone: localTimezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        });
+        setCurrentTime(`${str} (${localLocation})`);
+      } catch (err) {
+        setCurrentTime(new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC");
+      }
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [localTimezone, localLocation]);
 
   // Initialize workspace first message with learning process information (Rule 1)
   useEffect(() => {
@@ -190,9 +405,14 @@ Learning records are compiled and dynamically locked inside the current server i
     }
   }, []);
 
-  // Continuous timeline scroll
+  // Continuous timeline scroll with dynamic layout recalculation safety
   useEffect(() => {
-    timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollToEnd = () => {
+      timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+    scrollToEnd(); // Immediate scroll
+    const timer = setTimeout(scrollToEnd, 150); // Delayed scroll to catch layout animations
+    return () => clearTimeout(timer);
   }, [messages, isLoading]);
 
   // Handle analytical deconstruction query execution
@@ -213,6 +433,11 @@ Learning records are compiled and dynamically locked inside the current server i
       timestamp: new Date().toISOString()
     };
     setMessages(prev => [...prev, userMsg]);
+    setCurrentLoadCount(prev => prev + 1);
+
+    if (autoVocalize) {
+      handleSynthesizeText(term, userMsg.id);
+    }
 
     setTimeout(() => {
       setActivityLevel("analyzing");
@@ -227,7 +452,8 @@ Learning records are compiled and dynamically locked inside the current server i
           mode: currentMode,
           strictNullProtocol,
           useHighThinkingModel,
-          memoryDirectives
+          memoryDirectives,
+          forceEnglish
         })
       });
 
@@ -247,6 +473,9 @@ Learning records are compiled and dynamically locked inside the current server i
         };
         setMessages(prev => [...prev, errorMsg]);
         setActivityLevel("completed");
+        if (autoVocalize) {
+          handleSynthesizeText(errorMsg.content, errorMsg.id);
+        }
         return;
       }
 
@@ -269,6 +498,11 @@ Learning records are compiled and dynamically locked inside the current server i
 
       setMessages(prev => [...prev, aiMsg]);
       setActivityLevel("completed");
+
+      if (autoVocalize) {
+        const speakText = `${term} coordinate aligned. English deconstruction: ${node.desertMeaning || node.antiSpinMeaning || ""}. Root is ${node.root || ""}`;
+        handleSynthesizeText(speakText, aiMsg.id);
+      }
 
     } catch (err: any) {
       console.error("Deconstruction failed: ", err);
@@ -374,9 +608,14 @@ Learning records are compiled and dynamically locked inside the current server i
             <Terminal className="w-5 h-5 text-emerald-300" />
           </div>
           <div>
-            <span className="font-mono text-xs text-emerald-400 font-bold tracking-[0.2em] block uppercase">
-              Logos_qr
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-emerald-400 font-bold tracking-[0.2em] block uppercase">
+                Logos_qr
+              </span>
+              <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider font-semibold">
+                Educational Research Edition
+              </span>
+            </div>
             <span className="text-[10px] text-slate-400 block tracking-tight font-sans">
               Advanced Structural Linguistics & Conceptual Deconstruction
             </span>
@@ -390,6 +629,19 @@ Learning records are compiled and dynamically locked inside the current server i
             <span>{currentTime}</span>
           </div>
           <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className={`flex items-center gap-1.5 border px-2.5 py-1 rounded transition-all text-[11px] ${
+              isSidebarCollapsed
+                ? "bg-emerald-950/30 border-emerald-500/40 text-emerald-300 font-medium"
+                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-250 hover:border-slate-700"
+            }`}
+            title={isSidebarCollapsed ? "Switch to Standard layout" : "Collapse side widgets for extra calm focus"}
+          >
+            {isSidebarCollapsed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            <span>{isSidebarCollapsed ? "Relaxed Layout" : "Standard View"}</span>
+          </button>
+
+          <button
             onClick={handleExportTimeline}
             className="flex items-center gap-1 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white px-2.5 py-1 rounded transition-all text-[11px]"
             title="Download full Markdown transcript"
@@ -402,8 +654,13 @@ Learning records are compiled and dynamically locked inside the current server i
       {/* Main Structural Grid Section / Workspace Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-28">
         
-        {/* LEFT COMPONENT: Scrollable Chat Terminal (占据8列) */}
-        <section id="logos-scrolling-timeline" className="lg:col-span-8 flex flex-col gap-5 min-h-[500px]">
+        {/* LEFT COMPONENT: Scrollable Chat Terminal (Occupies 8 or 12 columns) */}
+        <section 
+          id="logos-scrolling-timeline" 
+          className={`flex flex-col gap-5 min-h-[500px] transition-all duration-300 ${
+            isSidebarCollapsed ? "lg:col-span-12" : "lg:col-span-8"
+          }`}
+        >
           {/* Quick Tab Header buttons */}
           <div className="flex flex-wrap sm:flex-nowrap bg-slate-950 p-1 rounded-lg border border-slate-900 gap-1">
             <button
@@ -466,67 +723,294 @@ Learning records are compiled and dynamically locked inside the current server i
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4 flex-grow"
               >
-                {/* Seed presets */}
-                <div className="bg-slate-950 border border-slate-900 rounded-lg p-3.5">
-                  <span className="block text-[10px] font-mono tracking-wider text-slate-500 uppercase mb-2">
-                    Preseeded Mechanics Vectors (Demo anchors for testing):
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => handlePreseedInput("ح-س-ب", Mode.ROOT_GENERATION)}
-                      className="bg-slate-900 hover:bg-slate-850 hover:text-emerald-400 px-3 py-1 rounded text-xs font-mono transition border border-slate-850"
-                    >
-                      [Root] ح-س-ب
-                    </button>
-                    <button
-                      onClick={() => handlePreseedInput("Haram", Mode.WORD_DECONSTRUCTION)}
-                      className="bg-slate-900 hover:bg-slate-850 hover:text-emerald-400 px-3 py-1 rounded text-xs font-mono transition border border-slate-850"
-                    >
-                      [Word] Haram / الحرام
-                    </button>
-                    <button
-                      onClick={() => handlePreseedInput("س-ن-د", Mode.ROOT_GENERATION)}
-                      className="bg-slate-900 hover:bg-slate-850 hover:text-emerald-400 px-3 py-1 rounded text-xs font-mono transition border border-slate-850"
-                    >
-                      [Root] س-ن-د
-                    </button>
-                    <button
-                      onClick={() => handlePreseedInput("Istabraq", Mode.WORD_DECONSTRUCTION)}
-                      className="bg-slate-900 hover:bg-slate-850 hover:text-emerald-400 px-3 py-1 rounded text-xs font-mono transition border border-slate-850"
-                    >
-                      [Word] Istabraq / إستبرق
-                    </button>
-                  </div>
-                </div>
-
-                {/* Algorithmic integrity trigger (Rule 5 fallback alert) */}
-                <div className="flex items-center justify-between bg-slate-950 border border-slate-900 rounded-md px-3.5 py-1.5">
-                  <span className="text-[10px] font-mono text-slate-500 uppercase">
-                    Thermodermal Block / Algorithmic Security:
-                  </span>
-                  <button
-                    onClick={() => setIsThrottled(!isThrottled)}
-                    className="text-[10px] bg-red-950/20 text-red-400 hover:bg-red-950 hover:text-red-300 font-mono px-2.5 py-0.5 rounded border border-red-900/40 transition"
-                  >
-                    Check Engine Throttling
-                  </button>
-                </div>
-
-                {isThrottled && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-3.5 bg-yellow-950/50 border border-yellow-700/30 rounded text-yellow-300 font-sans text-xs flex items-center gap-3"
-                  >
-                    <AlertTriangle className="w-5 h-5 shrink-0 text-yellow-400" />
-                    <div>
-                      <strong>تم تقييد الرد او العرض ⚠️🔒🚫</strong>
-                      <span className="block text-[10px] text-slate-400 mt-0.5">
-                        Response and preview limits have been dynamically applied. Operational integrity preserved under DE&I directives.
+                {/* AUTOMATED ENGINE DIAGNOSTIC HEALTH CONTROL BOARD */}
+                <div className="bg-slate-950 border border-slate-900 rounded-lg p-4 gap-3.5 flex flex-col">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-950/60 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-emerald-500/10 p-1 rounded font-mono">
+                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      </div>
+                      <span className="text-xs uppercase font-mono font-bold tracking-wider text-slate-300">
+                        AUTOMATED ENGINE DIAGNOSTIC HEALTH CONTROL BOARD
                       </span>
                     </div>
-                  </motion.div>
-                )}
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={runEngineDiagnostics}
+                        disabled={isDiagnosing}
+                        className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-900 text-slate-950 px-3 py-1.5 rounded text-[10px] font-mono font-bold transition flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(16,185,129,0.15)] disabled:text-slate-500 hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        <Activity className={`w-3.5 h-3.5 ${isDiagnosing ? 'animate-spin' : ''}`} />
+                        <span>{isDiagnosing ? "SCRUTINIZING SYSTEM..." : "RUN FULL DIAGNOSTICS"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => setIsDiagnosticsCollapsed(!isDiagnosticsCollapsed)}
+                        className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 bg-slate-900 hover:bg-slate-850 px-2.5 py-1.5 rounded border border-slate-800 transition shadow-sm"
+                      >
+                        {isDiagnosticsCollapsed ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronUp className="w-3 h-3 text-slate-400" />}
+                        <span>{isDiagnosticsCollapsed ? "Show Diagnostic Report" : "Hide Diagnostic Report"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {!isDiagnosticsCollapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      className="space-y-3.5 pt-1"
+                    >
+                      {diagnosticReport ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px] font-mono text-slate-300">
+                          
+                          {/* Card 1: Vitals Summary Card & Geo Location Calendar */}
+                          <div className="bg-[#020617] border border-slate-900 p-4 rounded-lg space-y-3 flex flex-col justify-between">
+                            <div className="space-y-3">
+                              <div className="text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-900 pb-1.5 flex items-center gap-1.5">
+                                <Globe className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                                📡 Core Engine Vitals & Geo Location Clock
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Diagnostic ID:</span>
+                                <span className="text-emerald-400 font-bold">{diagnosticReport.diagnosticId}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Health Status:</span>
+                                <span className="text-emerald-400 font-bold">{diagnosticReport.overallEngineHealth}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Frequency Calib:</span>
+                                <span className="text-cyan-300">{diagnosticReport.logosAlignmentSymmetries}</span>
+                              </div>
+
+                              <div className="flex flex-col gap-1.5 border-t border-slate-900/60 pt-2.5 text-[10px] text-slate-400">
+                                <span className="text-slate-500 font-bold uppercase tracking-wider text-[8px]">🌍 Dynamic Geo Calendar Log:</span>
+                                <div className="flex justify-between">
+                                  <span>Resolved Area:</span>
+                                  <span className="text-slate-200 font-bold">{diagnosticReport.resolvedGeoLoc?.city || "Detecting"}, {diagnosticReport.resolvedGeoLoc?.country || ""}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Time Zone:</span>
+                                  <span className="text-indigo-400 font-mono text-[9px]">{diagnosticReport.resolvedGeoLoc?.timezone || "Detecting"}</span>
+                                </div>
+                                <div className="text-[10px] text-teal-300 font-mono py-1 text-center bg-slate-950/80 px-2 rounded border border-slate-900/50 leading-relaxed mt-1">
+                                  {diagnosticReport.resolvedGeoLoc?.localTimeAndDate || "Evaluating Local Timestamp..."}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 flex items-center justify-between">
+                              <span>Clock Node: Local Zone</span>
+                              <span>Node: {diagnosticReport.systemMetrics?.nodeRuntime}</span>
+                            </div>
+                          </div>
+
+                          {/* Card 2: Mounted RAG Archive Validation */}
+                          <div className="bg-[#020617] border border-slate-900 p-4 rounded-lg space-y-3 flex flex-col justify-between">
+                            <div className="space-y-3">
+                              <div className="text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-900 pb-1.5 flex items-center gap-1.5">
+                                <FileText className="w-3.5 h-3.5 text-sky-400" />
+                                📂 Sourced Matrix Validation
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Mounted Files:</span>
+                                <span className="text-emerald-400 font-bold">{diagnosticReport.checks?.sourcedFilesSystem?.count} files</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Matrix Volume:</span>
+                                <span className="text-slate-300">{(diagnosticReport.checks?.sourcedFilesSystem?.totalBytes / 1024).toFixed(1)} KB</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Total Scanned:</span>
+                                <span className="text-slate-400">{diagnosticReport.checks?.sourcedFilesSystem?.totalWords} words</span>
+                              </div>
+
+                              <div className="flex flex-col gap-1 border-t border-slate-900/60 pt-2 text-[10px] text-slate-500 bg-slate-950/40 p-2 rounded">
+                                <span className="font-bold uppercase text-[8px] text-slate-400">Target Core Directives:</span>
+                                <div className="flex justify-between text-[9px] text-slate-400 mt-1">
+                                  <span>Memory storagePath:</span>
+                                  <span className="text-indigo-400">/logos_cognitive_memory.json</span>
+                                </div>
+                                <div className="flex justify-between text-[9px] text-slate-400">
+                                  <span>Injected prompt count:</span>
+                                  <span className="text-slate-300">{diagnosticReport.checks?.cognitiveMemoryStructures?.directivesConfiguredLogos} rules</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 text-right">
+                              Status: {diagnosticReport.checks?.sourcedFilesSystem?.status}
+                            </div>
+                          </div>
+
+                          {/* Card 3: Models Status & Rate Quota (Geared Slider & Utilization Dial) */}
+                          <div className="bg-[#020617] border border-slate-900 p-4 rounded-lg space-y-3.5 flex flex-col justify-between col-span-1 md:col-span-2">
+                            <div className="space-y-3">
+                              <div className="text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-900 pb-1.5 flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  <Sliders className="w-3.5 h-3.5 text-sky-400 animate-pulse" /> 
+                                  GENERIC API QUOTA SHIELD & RATE CALIBRATOR
+                                </span>
+                                <span className={diagnosticReport.checks?.underlyingGeminiCore?.apiKeyConfigured ? "text-emerald-400 font-bold text-[9px] bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-900/30" : "text-amber-500 font-bold text-[9px] bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-900/30"}>
+                                  {diagnosticReport.checks?.underlyingGeminiCore?.apiKeyConfigured ? "SECURE KEY ATTACHED" : "SANDBOX EMULATOR"}
+                                </span>
+                              </div>
+
+                              <div className="text-[10px] text-slate-400 leading-relaxed bg-slate-950 p-2.5 rounded border border-slate-900 space-y-1.5 font-sans">
+                                <p className="font-semibold text-sky-300 font-mono">Why rate restrict or quota limit?</p>
+                                <p className="text-slate-500 leading-relaxed">
+                                  Production engines establish ceiling maximums (Safe-RPM thresholds) to defend computing nodes from infinite cascading loops, avoid denial-of-service degradation, and budget operational expenditures.
+                                </p>
+                              </div>
+
+                              {/* Interactive Geared Slider */}
+                              <div className="space-y-1.5 bg-slate-950/60 p-2.5 rounded border border-slate-900">
+                                <div className="flex justify-between text-[10px]">
+                                  <span className="text-slate-400 font-semibold uppercase">Calibrate Safe Peak Limit:</span>
+                                  <span className="text-sky-400 font-mono font-bold">{quotaRpm} RPM (Requests Per Min)</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="5"
+                                  max="120"
+                                  step="5"
+                                  value={quotaRpm}
+                                  onChange={(e) => setQuotaRpm(Number(e.target.value))}
+                                  className="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 transition"
+                                />
+                                <div className="flex justify-between text-[8px] text-slate-600 font-sans">
+                                  <span>5 RPM (Debug Mode)</span>
+                                  <span>60 RPM (Standard limit)</span>
+                                  <span>120 RPM (Peak scale)</span>
+                                </div>
+                              </div>
+
+                              {/* Dynamic Load Indicator */}
+                              <div className="bg-slate-950/40 p-2.5 rounded border border-slate-900 space-y-2">
+                                <div className="flex justify-between items-center text-[10px]">
+                                  <span className="text-slate-400 font-sans uppercase">Real-Time Window Load:</span>
+                                  <span className={`font-mono font-bold ${
+                                    Math.round(((currentLoadCount * 5) / quotaRpm) * 100) > 85 ? "text-rose-400" : "text-emerald-400"
+                                  }`}>
+                                    {currentLoadCount * 5} RPM / {quotaRpm} RPM Peak ({Math.min(100, Math.round(((currentLoadCount * 5) / quotaRpm) * 100))}% load)
+                                  </span>
+                                </div>
+                                
+                                <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                      Math.round(((currentLoadCount * 5) / quotaRpm) * 100) > 85 ? "bg-rose-500 shadow-[0_0_8px_#f43f5e]" : "bg-sky-500 shadow-[0_0_8px_#0ea5e9]"
+                                    }`}
+                                    style={{ width: `${Math.min(100, ((currentLoadCount * 5) / quotaRpm) * 100)}%` }}
+                                  />
+                                </div>
+
+                                <div className="text-[9px] text-slate-500 font-sans flex items-center justify-between">
+                                  <span>API Counter: {currentLoadCount} active query hits in sliding window</span>
+                                  <span className={`font-bold ${
+                                    currentLoadCount * 5 >= quotaRpm ? "text-rose-400 animate-pulse" : "text-slate-600"
+                                  }`}>
+                                    {currentLoadCount * 5 >= quotaRpm ? "⚠️ CRITICAL THROTTLED" : "✓ GATEWAY PASS"}
+                                  </span>
+                                </div>
+                              </div>
+
+                            </div>
+                            <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 truncate">
+                              Associated diagnostic file: {diagnosticReport.checks?.sourcedFilesSystem?.files?.slice(-1)[0]?.name || "report.json"}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-500 font-mono text-center py-2">
+                          Click the "RUN FULL DIAGNOSTICS" button to initiate checks of the model parameters, quota status, mounted memory directives, and write a global historical report file to disk.
+                        </p>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Educational Reference & Decoders Guide */}
+                <div className="flex flex-col bg-slate-950 border border-slate-900 rounded-lg p-3.5 gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <HelpCircle className="w-4 h-4 text-cyan-400" />
+                      <span className="text-[11px] font-sans font-medium text-slate-300">
+                        Language Symmetries & Neural Output Decoder Guide
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setIsGuideCollapsed(!isGuideCollapsed)}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 bg-slate-900 hover:bg-slate-850 px-2.5 py-1 rounded border border-slate-800 transition shadow-sm"
+                    >
+                      {isGuideCollapsed ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronUp className="w-3 h-3 text-slate-400" />}
+                      <span>{isGuideCollapsed ? "Show Output Decoders" : "Hide Output Decoders"}</span>
+                    </button>
+                  </div>
+
+                  {!isGuideCollapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      className="text-xs text-slate-400 space-y-3.5 pt-2 border-t border-slate-900"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5 bg-slate-900/40 p-3 rounded border border-slate-900">
+                          <span className="text-cyan-300 font-bold block text-[11px] uppercase tracking-wide">
+                            🔮 Neural Frequency (Hz) Calibration
+                          </span>
+                          <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+                            <strong>432.0 Hz:</strong> Representing universal harmonic equilibrium. This calibration signifies complete structural consensus across natural language coordinates (equilibrium points).
+                          </p>
+                          <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+                            <strong>942.8 Hz:</strong> Elevated bandwidth cognitive processing. Active state during live generative pipeline iterations, multi-agent evaluation, or dynamic vector synthesis.
+                          </p>
+                        </div>
+
+                        <div className="space-y-1.5 bg-slate-900/40 p-3 rounded border border-slate-900">
+                          <span className="text-emerald-400 font-bold block text-[11px] uppercase tracking-wide">
+                            🏵️ Symmetrical Spheroid Mandala
+                          </span>
+                          <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+                            Highly complex vector mathematics representation mapping dynamic computational load. The spin rate adjusts to match query operational latency, translating structural linguistic alignment into a physical kinetic artifact.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 bg-slate-900/30 p-3.5 rounded-lg border border-slate-900">
+                        <span className="text-slate-350 font-bold block text-[10px] uppercase tracking-widest text-slate-300">
+                          🧱 Structural Output Block Symbols Defined:
+                        </span>
+                        
+                        <div className="space-y-2 divide-y divide-slate-900">
+                          <div className="pt-2 flex items-start gap-2.5">
+                            <span className="bg-emerald-950/40 text-emerald-400 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">🏜️ Desert meaning</span>
+                            <span className="text-[11px] leading-relaxed">The primordial material movement signature. Tracing Arabic trilateral consonant roots back to actual kinetic behaviors in an unforgiving thermodynamic landscape.</span>
+                          </div>
+
+                          <div className="pt-2 flex items-start gap-2.5">
+                            <span className="bg-indigo-950/40 text-indigo-400 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">🌀 anti-spin translation</span>
+                            <span className="text-[11px] leading-relaxed">Literal modern equivalents stripped of theological, cultural, or religious filters. Pure technological and mechanical output.</span>
+                          </div>
+
+                          <div className="pt-2 flex items-start gap-2.5">
+                            <span className="bg-pink-950/40 text-pink-400 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">🧬 cross-linguistic map</span>
+                            <span className="text-[11px] leading-relaxed">Phonetic direction parameters illustrating common paths of force/consonant alignment between Arabic roots and Indo-European languages.</span>
+                          </div>
+
+                          <div className="pt-2 flex items-start gap-2.5">
+                            <span className="bg-amber-950/40 text-amber-500 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">🧠 analogy engines</span>
+                            <span className="text-[11px] leading-relaxed">Cybernetic, biological, and physical translation frameworks mapping semantic movements onto real-world modern systems.</span>
+                          </div>
+
+                          <div className="pt-2 flex items-start gap-2.5">
+                            <span className="bg-cyan-950/40 text-cyan-400 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">📂 dynamic learning logs</span>
+                            <span className="text-[11px] leading-relaxed">Groundwork diagnostics recording precise discoveries, memory anchor offsets, and future linguistic planned segments.</span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
 
                 {/* Timeline continuous message list representation */}
                 <div className="space-y-4">
@@ -537,22 +1021,61 @@ Learning records are compiled and dynamically locked inside the current server i
                         msg.role === "user"
                           ? "bg-slate-900/50 border-slate-800 ml-12 text-slate-100"
                           : msg.role === "system"
-                          ? "bg-slate-950/80 border-slate-900 text-slate-400 font-mono text-xs whitespace-pre-wrap leading-relaxed"
+                          ? "bg-slate-950 border-slate-900 text-slate-400 font-mono text-xs leading-relaxed"
                           : "bg-slate-950 border-slate-800 text-slate-300"
                       }`}
                     >
-                      <div className="flex items-center justify-between border-b border-slate-900 pb-1.5 mb-2.5 text-[10px] font-mono text-slate-500">
-                        <span className="uppercase tracking-wider">
-                          {msg.role === "user" ? "SYSTEM_INPUT" : msg.role === "system" ? "KERNEL_LOG" : "DECONSTRUCTION_OUTPUT"}
-                        </span>
-                        <span>{msg.timestamp.substring(11, 19)}</span>
-                      </div>
+                      {msg.role === "system" ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between border-b border-slate-900 pb-1.5 text-[10px] font-mono text-slate-500">
+                            <span className="uppercase tracking-wider flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                              KERNEL_LOG / BOOT ENVIRONMENT
+                            </span>
+                            <span>{msg.timestamp.substring(11, 19)}</span>
+                          </div>
+                          {expandedSystemIds.includes(msg.id) ? (
+                            <div className="transition-all whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-400">
+                              {msg.content}
+                              <div className="mt-3 text-right">
+                                <button
+                                  onClick={() => setExpandedSystemIds(expandedSystemIds.filter(id => id !== msg.id))}
+                                  className="text-[10px] text-indigo-400 hover:text-indigo-300 font-mono bg-slate-900 px-2.5 py-1 rounded border border-slate-800 transition shadow"
+                                >
+                                  Collapse Kernel Log ▲
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between py-1 bg-slate-900/30 px-2.5 rounded border border-slate-900/40">
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                System boot matrix & classical Semitic reference files successfully mounted.
+                              </span>
+                              <button
+                                onClick={() => setExpandedSystemIds([...expandedSystemIds, msg.id])}
+                                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono bg-slate-900 px-2.5 py-1 rounded border border-slate-800 transition shadow"
+                              >
+                                Expand Logs ▼
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between border-b border-slate-900 pb-1.5 mb-2.5 text-[10px] font-mono text-slate-500">
+                            <span className="uppercase tracking-wider">
+                              {msg.role === "user" ? "SYSTEM_INPUT" : "DECONSTRUCTION_OUTPUT"}
+                            </span>
+                            <span>{msg.timestamp.substring(11, 19)}</span>
+                          </div>
 
-                      {/* Display raw textual content */}
-                      {msg.content && !msg.deconstruction && (
-                        <p className="dir-ltr text-left font-sans text-sm pr-2">
-                          {msg.content}
-                        </p>
+                          {/* Display raw textual content */}
+                          {msg.content && !msg.deconstruction && (
+                            <p className="dir-ltr text-left font-sans text-sm pr-2">
+                              {msg.content}
+                            </p>
+                          )}
+                        </>
                       )}
 
                       {/* Structured Deconstruction Node output (Collapsible sub-elements) */}
@@ -574,25 +1097,34 @@ Learning records are compiled and dynamically locked inside the current server i
                               </div>
                             </div>
 
-                            <button
-                              onClick={() => {
-                                if (msg.deconstruction) {
-                                  const allTxt = `Root: ${msg.deconstruction.root}. Meaning: ${msg.deconstruction.desertMeaning}. Anti-spin: ${msg.deconstruction.antiSpinMeaning}`;
-                                  handleSynthesizeText(allTxt, msg.id);
-                                }
-                              }}
-                              className="self-start md:self-center flex items-center gap-2 bg-slate-950 text-emerald-400 border border-emerald-900/50 px-3.5 py-2 hover:bg-slate-900 rounded font-sans text-xs tracking-wider transition-all"
-                            >
-                              {isPlayingId === msg.id ? (
-                                <>
-                                  <VolumeX className="w-4 h-4" /> Stop Audio
-                                </>
-                              ) : (
-                                <>
-                                  <Volume2 className="w-4 h-4" /> Play Audio Engine
-                                </>
-                              )}
-                            </button>
+                            <div className="self-start md:self-center flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => setActiveGraphDeconstruction(msg.deconstruction)}
+                                className="flex items-center gap-1.5 bg-[#020617] text-sky-400 border border-sky-950 hover:border-sky-850 px-3 py-2 hover:bg-slate-900 rounded font-sans text-xs tracking-wider transition-all hover:scale-[1.01] active:scale-[0.99] shadow-sm"
+                              >
+                                <GitBranch className="w-3.5 h-3.5" /> D3 Map Root
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  if (msg.deconstruction) {
+                                    const allTxt = `Root: ${msg.deconstruction.root}. Meaning: ${msg.deconstruction.desertMeaning}. Anti-spin: ${msg.deconstruction.antiSpinMeaning}`;
+                                    handleSynthesizeText(allTxt, msg.id);
+                                  }
+                                }}
+                                className="flex items-center gap-1.5 bg-[#020617] text-emerald-400 border border-emerald-950 hover:border-emerald-850 px-3 py-2 hover:bg-slate-900 rounded font-sans text-xs tracking-wider transition-all hover:scale-[1.01] active:scale-[0.99] shadow-sm"
+                              >
+                                {isPlayingId === msg.id ? (
+                                  <>
+                                    <VolumeX className="w-3.5 h-3.5" /> Stop Audio
+                                  </>
+                                ) : (
+                                  <>
+                                    <Volume2 className="w-3.5 h-3.5" /> Play Audio Engine
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
 
                           {/* Dynamic Reasoning Metadata Board (Requirements 2 & 3) */}
@@ -664,6 +1196,51 @@ Learning records are compiled and dynamically locked inside the current server i
                               )}
                             </div>
                           )}
+
+                          {/* Spheroid RAG & LLM Engine Diagnostic Panel (Explicit display of relevance score and source file title) */}
+                          <div className="bg-[#0b1329]/50 border border-slate-800 rounded-lg p-3.5 space-y-3 font-mono">
+                            <div className="flex items-center gap-2 border-b border-slate-900 pb-2">
+                              <Database className="w-4 h-4 text-cyan-400" />
+                              <span className="text-[11px] uppercase font-bold text-slate-300 tracking-wider">Linguistic RAG & LLM Engine diagnostics</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-[11px]">
+                              <div className="bg-slate-950 p-2.5 rounded border border-slate-900">
+                                <span className="text-slate-500 block text-[9px] uppercase font-bold">RAG Relevance Score</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <div className="flex-1 bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                                    <div 
+                                      className={`h-full rounded-full ${
+                                        msg.deconstruction.matrixAnchoring?.found ? "bg-emerald-500" : "bg-indigo-500"
+                                      }`}
+                                      style={{ width: `${msg.deconstruction.matrixAnchoring?.found ? (msg.deconstruction.matrixAnchoring.relevanceScore || 100) : 70}%` }}
+                                    />
+                                  </div>
+                                  <span className={`font-bold shrink-0 ${msg.deconstruction.matrixAnchoring?.found ? "text-emerald-400" : "text-slate-400"}`}>
+                                    {msg.deconstruction.matrixAnchoring?.found 
+                                      ? `${msg.deconstruction.matrixAnchoring.relevanceScore || 100}% [Optimal Match]`
+                                      : "70% [Probabilistic General Core]"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="bg-slate-950 p-2.5 rounded border border-slate-900">
+                                <span className="text-slate-500 block text-[9px] uppercase font-bold">Source Matrix Doc Title</span>
+                                <span className={`block font-bold mt-1 text-xs truncate ${msg.deconstruction.matrixAnchoring?.found ? "text-cyan-300" : "text-indigo-400"}`}>
+                                  {msg.deconstruction.matrixAnchoring?.found 
+                                    ? `📄 ${msg.deconstruction.matrixAnchoring.sourceFile}`
+                                    : "🧠 Dynamic LLM Generative Context"}
+                                </span>
+                              </div>
+                            </div>
+                            {msg.deconstruction.matrixAnchoring?.found && msg.deconstruction.matrixAnchoring.verbatimVerse && (
+                              <div className="bg-slate-950 p-2.5 rounded border border-slate-900/60 text-[10px] text-slate-400 leading-relaxed">
+                                <span className="text-slate-500 block font-bold uppercase mb-1">Verbatim Anchored Verse:</span>
+                                <p className="font-sans italic text-right text-slate-300" style={{ direction: "rtl" }}>
+                                  "{msg.deconstruction.matrixAnchoring.verbatimVerse}"
+                                </p>
+                              </div>
+                            )}
+                          </div>
 
                           {/* 1. Naked Desert Meaning Block */}
                           <div>
@@ -907,121 +1484,290 @@ Learning records are compiled and dynamically locked inside the current server i
           </AnimatePresence>
         </section>
 
-        {/* RIGHT COMPONENT: Spheroid Controls (占据4列) */}
-        <aside className="lg:col-span-4 flex flex-col gap-5 lg:sticky lg:top-20">
-          
-          {/* Spheroid Mandala Node */}
-          <div className="bg-slate-950 border border-slate-800 rounded-lg p-5 flex flex-col items-center justify-center shadow-md">
-            <span className="text-[10px] font-mono tracking-wider text-slate-500 uppercase mb-2">
-              Neural Expressive Aesthetic Spheroid
-            </span>
-            <ArabesqueMandala isLoading={isLoading} activityLevel={activityLevel} />
-            <div className="mt-3 text-center">
-              <span className="font-sans font-semibold text-xs text-slate-300">
-                Linguistic Symmetrical Alignment
+        {/* RIGHT COMPONENT: Spheroid Controls (Occupies 4 columns, hidden in Relaxed Mode) */}
+        {!isSidebarCollapsed && (
+          <aside className="lg:col-span-4 flex flex-col gap-5 lg:sticky lg:top-20">
+            
+            {/* Spheroid Mandala Node */}
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-5 flex flex-col items-center justify-center shadow-md">
+              <span className="text-[10px] font-mono tracking-wider text-slate-500 uppercase mb-2">
+                Neural Expressive Aesthetic Spheroid
               </span>
-              <p className="text-[10px] text-slate-500 mt-1 max-w-[220px] leading-snug">
-                Rotating proportional to system clock frequencies. Arabesque symmetries represent high-resolution distinction.
+              <ArabesqueMandala isLoading={isLoading} activityLevel={activityLevel} />
+              <div className="mt-3 text-center">
+                <span className="font-sans font-semibold text-xs text-slate-300">
+                  Linguistic Symmetrical Alignment
+                </span>
+                <p className="text-[10px] text-slate-500 mt-1 max-w-[220px] leading-snug">
+                  Rotating proportional to system clock frequencies. Arabesque symmetries represent high-resolution distinction.
+                </p>
+              </div>
+            </div>
+
+            {/* SYSTEM METRIC MATRIX COLLAPSIBLE CONTROL */}
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col gap-3 shadow-md">
+              <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-300">
+                  <Activity className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                  <span>SYSTEM METRIC MATRIX</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Engine core is active and connected" />
+                  <button
+                    onClick={() => setIsMetricsCollapsed(!isMetricsCollapsed)}
+                    className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded font-mono text-[9px] flex items-center gap-0.5 border border-slate-900 transition"
+                  >
+                    {isMetricsCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+                    <span>{isMetricsCollapsed ? "Unhide" : "Hide"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {isMetricsCollapsed ? (
+                /* Collapsed micro badges display */
+                <div className="flex flex-wrap gap-1.5 py-1">
+                  <span className="text-[9px] font-mono bg-[#0c1020] text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-950/40" title="Primary core mode">
+                    🧠 {useHighThinkingModel ? "Pro" : "Flash"}
+                  </span>
+                  <span className="text-[9px] font-mono bg-[#0c1020] text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-950/40" title="RAG reference files">
+                    🔒 RAG: {strictNullProtocol ? "Strict" : "Hybrid"}
+                  </span>
+                  <span className="text-[9px] font-mono bg-[#0c1020] text-sky-300 px-1.5 py-0.5 rounded border border-sky-950/40" title="Vocalizer chat mode">
+                    🗣️ {autoVocalize ? "ON" : "OFF"}
+                  </span>
+                  <span className="text-[9px] font-mono bg-[#0c1020] text-amber-300 px-1.5 py-0.5 rounded border border-amber-950/40" title="Output target translation text">
+                    🇺🇸 LTR: {forceEnglish ? "ENG" : "SYM"}
+                  </span>
+                </div>
+              ) : (
+                /* Expanded fully detailed and interactive parameters with symbol icons/badges */
+                <div className="space-y-3.5 font-mono text-[10px] text-slate-400">
+                  
+                  {/* Primary Engine Core with dynamic toggle details */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[10px] text-slate-300">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <Brain className="w-3.5 h-3.5 text-indigo-400" /> Core Engine Model
+                      </span>
+                      <span className="text-indigo-300 font-bold bg-[#0c1020] px-1.5 py-0.5 rounded border border-indigo-950/40">
+                        {useHighThinkingModel ? "Gemini Pro" : "Gemini Flash"}
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
+                      {useHighThinkingModel 
+                        ? "Executing deep cognitive semantic parsing. Aided by multi-tier fallback chain reasoning." 
+                        : "Executing lightning-fast context alignments. Lower latency response cycles."}
+                    </p>
+                  </div>
+
+                  {/* RAG Sourced File Indexer State info */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[10px] text-slate-300">
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <FileText className="w-3.5 h-3.5 text-emerald-400" /> Sourced RAG Engine
+                      </span>
+                      <span className="text-emerald-400 font-bold bg-[#0c1020] px-1.5 py-0.5 rounded border border-emerald-950/40">
+                        {strictNullProtocol ? "Strict Files" : "Hybrid Parse"}
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
+                      {strictNullProtocol 
+                        ? "Requires 100% exact matching index file constraints [Anti-Hallucination active]." 
+                        : "Synthesizes outer models knowledge space with reference index matrix guidelines."}
+                    </p>
+                  </div>
+
+                  {/* TTS Vocalizer Switch Controller slider */}
+                  <div className="space-y-1.5 bg-[#090d1f]/40 p-2 rounded-md border border-slate-900/60">
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1.5 text-slate-300 font-semibold">
+                        <Mic className="w-3.5 h-3.5 text-sky-400" /> Vocalize Chat Pipe
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] text-slate-500 font-sans">{autoVocalize ? "Speaking" : "Muted"}</span>
+                        <button
+                          type="button"
+                          onClick={() => setAutoVocalize(!autoVocalize)}
+                          className="relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                          style={{ backgroundColor: autoVocalize ? '#0ea5e9' : '#334155' }}
+                        >
+                          <span
+                            className="pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                            style={{ transform: autoVocalize ? 'translateX(10px)' : 'translateX(0px)' }}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
+                      Vocalizes user inputs and deconstruction outputs automatically via TTS synthesis vector.
+                    </p>
+                  </div>
+
+                  {/* RTL symmetry parser with Force English toggle */}
+                  <div className="space-y-1.5 bg-[#090d1f]/40 p-2 rounded-md border border-slate-900/60">
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1.5 text-slate-300 font-semibold">
+                        <Globe className="w-3.5 h-3.5 text-amber-400" /> Context: English LTR
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] text-slate-500 font-sans">{forceEnglish ? "English LTR" : "Symmetrical"}</span>
+                        <button
+                          type="button"
+                          onClick={() => setForceEnglish(!forceEnglish)}
+                          className="relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                          style={{ backgroundColor: forceEnglish ? '#f59e0b' : '#334155' }}
+                        >
+                          <span
+                            className="pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                            style={{ transform: forceEnglish ? 'translateX(10px)' : 'translateX(0px)' }}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
+                      {forceEnglish 
+                        ? "Forces target output translation fully into English. Eliminates bilingual Arabic descriptions block." 
+                        : "Delivers symmetrical Arabic blocks with separate isolated English text lines."}
+                    </p>
+                  </div>
+
+                  {/* Network Anchor spec */}
+                  <div className="flex justify-between items-center border-t border-slate-900 pt-2 text-slate-500">
+                    <span>Matrix Anchoring Guard:</span>
+                    <span className="text-emerald-400/90 font-bold tracking-wider flex items-center gap-0.5">
+                      ● ONLINE-REFS
+                    </span>
+                  </div>
+
+                </div>
+              )}
+            </div>
+
+            {/* Help & definitions card */}
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-slate-900">
+                <HelpCircle className="w-4 h-4 text-slate-400" />
+                <span className="text-xs uppercase font-sans font-bold tracking-wider text-slate-300">Linguistic Framework</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed leading-snug">
+                Materialist Arabic etymology isolates pure physical movement signatures. Roots are treated as specific directions of force or mass coordination inside thermodynamics rather than dogmatic metaphors.
               </p>
             </div>
-          </div>
-
-          {/* Quick System specs */}
-          <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-[11px] text-slate-400 space-y-2.5">
-            <div className="flex items-center justify-between border-b border-slate-900 pb-1.5 mb-2.5">
-              <span className="uppercase text-slate-300 font-bold">SYSTEM METRIC MATRIX</span>
-              <span className="text-[10px] bg-slate-900 text-emerald-400 font-semibold px-1 rounded">ACTIVE</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Primary Engine Core:</span>
-              <span className="text-slate-200">Gemini 3.5 Flash</span>
-            </div>
-            <div className="flex justify-between">
-              <span>TTS Synthesis Vector:</span>
-              <span className="text-slate-200">Gemini 3.1 TTS</span>
-            </div>
-            <div className="flex justify-between">
-              <span>RTL Context Parser:</span>
-              <span className="text-slate-200">V2 Symmetrical</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Matrix Anchors:</span>
-              <span className="text-emerald-400">ONLINE</span>
-            </div>
-          </div>
-
-          {/* Help & definitions card */}
-          <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-slate-900">
-              <HelpCircle className="w-4 h-4 text-slate-400" />
-              <span className="text-xs uppercase font-sans font-bold tracking-wider text-slate-300">Linguistic Framework</span>
-            </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed leading-snug">
-              Materialist Arabic etymology isolates pure physical movement signatures. Roots are treated as specific directions of force or mass coordination inside thermodynamics rather than dogmatic metaphors.
-            </p>
-          </div>
-        </aside>
+          </aside>
+        )}
       </main>
 
       {/* FIXED ANCHORED INPUT TERMINAL AT BOTTOM */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-[#020617]/90 backdrop-blur-md border-t border-slate-800 py-3.5 px-4 shadow-[0_-15px_30px_rgba(2,6,23,0.8)]">
+      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-[#020617]/90 backdrop-blur-md border-t border-slate-800 py-3 px-4 shadow-[0_-15px_30px_rgba(2,6,23,0.8)]">
         <div className="max-w-4xl mx-auto">
           <form onSubmit={executeDeconstruction} className="flex flex-col gap-2.5">
-            <div className="flex items-center justify-between">
-              {/* Mode switch Toggles */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCurrentMode(Mode.WORD_DECONSTRUCTION)}
-                  className={`px-3 py-1 rounded text-xs transition duration-150 ${
-                    currentMode === Mode.WORD_DECONSTRUCTION
-                      ? "bg-emerald-600 text-slate-950 font-bold"
-                      : "bg-slate-900 text-slate-400 border border-slate-850 hover:text-slate-200"
-                  }`}
-                >
-                  Mode A: Word Deconstruct
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentMode(Mode.ROOT_GENERATION)}
-                  className={`px-3 py-1 rounded text-xs transition duration-150 ${
-                    currentMode === Mode.ROOT_GENERATION
-                      ? "bg-emerald-600 text-slate-950 font-bold"
-                      : "bg-slate-900 text-slate-400 border border-slate-850 hover:text-slate-200"
-                  }`}
-                >
-                  Mode B: Root Generator
-                </button>
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#090d1f]/60 border border-slate-800/80 rounded-lg px-3 py-1.5 text-xs">
+              
+              {/* 1. Auto-Hybrid Smart Selection Tracker Badge */}
+              <div className="flex items-center gap-2" title="Unified Dynamic Smart Selection Hybrid Mode is active">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span className="text-[10px] text-slate-300 font-sans font-semibold uppercase tracking-wider">
+                  Hybrid Mode:
+                </span>
+                <span className="text-emerald-400 font-mono text-[9px] bg-emerald-950/30 border border-emerald-900/30 px-1.5 py-0.5 rounded font-bold">
+                  ⚡ INSTANT
+                </span>
               </div>
 
-              {/* Status Indicator & High thinking toggle */}
-              <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono">
-                {strictNullProtocol ? (
-                  <span className="text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    Closed Coordinate Matrix Active [Files Only]
-                  </span>
-                ) : (
-                  <span className="text-slate-500">
-                    Spheroid General Parsing Active [AI + Files]
-                  </span>
-                )}
+              {/* Toggles area for switches */}
+              <div className="flex items-center gap-3.5 flex-wrap">
 
-                <span className="text-slate-800">|</span>
-
-                <button
-                  type="button"
-                  onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}
-                  className={`px-2.5 py-0.5 rounded border flex items-center gap-1 transition ${
-                    useHighThinkingModel
-                      ? "bg-indigo-950/80 border-indigo-400/40 text-indigo-300 font-bold"
-                      : "bg-slate-900/60 border-slate-800 text-slate-500 hover:text-slate-300"
-                  }`}
-                  title="Toggle between lightning-fast flash and deep cognitive pro reasoning"
+                {/* 2. Closed Coordinate Matrix Active (strictNullProtocol) slider switch */}
+                <div 
+                  className="flex items-center gap-2 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded cursor-pointer select-none"
+                  onClick={() => setStrictNullProtocol(!strictNullProtocol)}
+                  title="Toggle sandbox strict index file verification versus open general parameters"
                 >
-                  <Brain className="w-3 h-3 text-indigo-400" />
-                  <span>{useHighThinkingModel ? "HIGH-THINKING ACTIVE [PRO_MODEL]" : "STANDARD CORE [FLASH_MODEL]"}</span>
-                </button>
+                  <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    {strictNullProtocol ? "🔒 Matrix Filter" : "🌐 Spheroid Parse"}
+                  </span>
+                  <button
+                    type="button"
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: strictNullProtocol ? '#10b981' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: strictNullProtocol ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+
+                {/* 3. Deep Thinking Mode toggle switch */}
+                <div 
+                  className="flex items-center gap-2 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded cursor-pointer select-none"
+                  onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}
+                  title="Toggle cognitive pro thinking versus rapid real-time flash parser"
+                >
+                  <span className="text-[10px] text-indigo-400 font-mono flex items-center gap-1">
+                    <Brain className="w-3 h-3 text-indigo-400" />
+                    {useHighThinkingModel ? "🧠 Pro Core" : "⚡ Flash Core"}
+                  </span>
+                  <button
+                    type="button"
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: useHighThinkingModel ? '#6366f1' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: useHighThinkingModel ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+
+                {/* 4. Automatic Chat Vocalizer (autoVocalize) switch */}
+                <div 
+                  className="flex items-center gap-2 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded cursor-pointer select-none"
+                  onClick={() => setAutoVocalize(!autoVocalize)}
+                  title="Toggle automatic AI read aloud voice synthesizer"
+                >
+                  <span className="text-[10px] text-sky-400 font-mono flex items-center gap-1">
+                    {autoVocalize ? "🗣️ Auto Voc" : "🔇 Voc Mute"}
+                  </span>
+                  <button
+                    type="button"
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: autoVocalize ? '#0ea5e9' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: autoVocalize ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+
+                {/* 5. English LTR target forceEnglish switch */}
+                <div 
+                  className="flex items-center gap-2 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded cursor-pointer select-none"
+                  onClick={() => setForceEnglish(!forceEnglish)}
+                  title="Toggle English Translation output LTR mode"
+                >
+                  <span className="text-[10px] text-amber-550 font-mono flex items-center gap-1">
+                    🇺🇸 {forceEnglish ? "English LTR" : "Symmetric AR/EN"}
+                  </span>
+                  <button
+                    type="button"
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: forceEnglish ? '#f59e0b' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: forceEnglish ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+
+                {/* 6. English / Arabic bilingual flags badge */}
+                <div className="flex items-center gap-1 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded font-mono text-[9px] text-slate-500">
+                  <span>Alignment:</span>
+                  <span className="text-xs">{forceEnglish ? "🇺🇸 Only" : "🇺🇸 | 🇸🇦"}</span>
+                </div>
+
               </div>
             </div>
 
@@ -1064,6 +1810,23 @@ Learning records are compiled and dynamically locked inside the current server i
                 className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-lg px-4 py-3 text-sm font-sans placeholder-slate-600 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
               />
               <button
+                type="button"
+                onClick={startListening}
+                disabled={isLoading}
+                className={`p-3 rounded-lg border transition-all flex items-center justify-center shrink-0 ${
+                  isListening
+                    ? "bg-red-950/55 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.4)] animate-pulse"
+                    : "bg-slate-900 border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-slate-700"
+                }`}
+                title="Voice input: speak live in Arabic (Mode A) or English (Mode B) to fill input field"
+              >
+                {isListening ? (
+                  <MicOff className="w-5 h-5" />
+                ) : (
+                  <Mic className="w-5 h-5" />
+                )}
+              </button>
+              <button
                 type="submit"
                 disabled={isLoading || !inputText.trim()}
                 className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-900 text-slate-950 hover:text-black font-semibold text-sm px-5 py-3 rounded-lg transition-all duration-150 flex items-center gap-1.5 focus:outline-none disabled:text-slate-600 border border-emerald-400/20 shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:shadow-none"
@@ -1075,6 +1838,15 @@ Learning records are compiled and dynamically locked inside the current server i
           </form>
         </div>
       </footer>
+
+      <AnimatePresence>
+        {activeGraphDeconstruction && (
+          <RootRelationshipGraph
+            deconstruction={activeGraphDeconstruction}
+            onClose={() => setActiveGraphDeconstruction(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

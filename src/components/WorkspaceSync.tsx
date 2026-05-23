@@ -23,6 +23,7 @@ import {
 import { DeconstructionNode } from "../types";
 import { db, auth } from "../lib/firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc, query, where, Timestamp } from "firebase/firestore";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 
 interface WorkspaceSyncProps {
   onDocumentMounted: () => void;
@@ -42,6 +43,14 @@ export default function WorkspaceSync({ onDocumentMounted, activeDeconstruction 
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ name: string; email: string; picture: string } | null>(null);
   
+  // Custom Google App Credential configuration to prevent 403
+  const [clientId, setClientId] = useState(() => {
+    return localStorage.getItem("logos_gworkspace_client_id") || "221965411522-8vub12fggc2c2ofr9be0un08on80r033.apps.googleusercontent.com";
+  });
+  const [requestBroadScopes, setRequestBroadScopes] = useState(() => {
+    return localStorage.getItem("logos_gworkspace_broad_scopes") === "true";
+  });
+
   // Dynamic file list from Google Drive
   const [driveFiles, setDriveFiles] = useState<Array<{ id: string; name: string; mimeType: string }>>([]);
   const [isFetchingDrive, setIsFetchingDrive] = useState(false);
@@ -200,30 +209,57 @@ export default function WorkspaceSync({ onDocumentMounted, activeDeconstruction 
     }
   }, []);
 
-  // Triggers OAuth redirection flow
-  const handleInitiateOAuth = () => {
-    const client_id = "221965411522-8vub12fggc2c2ofr9be0un08on80r033.apps.googleusercontent.com"; // Verified Client ID
-    const redirect_uri = window.location.origin + window.location.pathname;
-    const scopes = [
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/drive.file",
-      "https://www.googleapis.com/auth/drive",
-      "https://www.googleapis.com/auth/documents"
-    ].join(" ");
+  // Triggers OAuth flow via Firebase Auth Popup (avoids 401 Client ID and Redirect error)
+  const handleInitiateOAuth = async () => {
+    setIsWorking(true);
+    setFeedback(null);
+    addDebugLog("Initiating Google Workspace sign-in popup flow via Firebase...");
+    try {
+      const provider = new GoogleAuthProvider();
+      
+      // Request essential user info plus drive.file scopes by default
+      provider.addScope("https://www.googleapis.com/auth/userinfo.profile");
+      provider.addScope("https://www.googleapis.com/auth/userinfo.email");
+      provider.addScope("https://www.googleapis.com/auth/drive.file");
 
-    addDebugLog("Initiating Google accounts login sequence redirection.");
-    addDebugLog(`Registering Redirect URI: ${redirect_uri}`);
-    addDebugLog(`Required Scopes: ${scopes}`);
+      if (requestBroadScopes) {
+        addDebugLog("Injecting broad Drive and Docs scopes requested by admin settings...");
+        provider.addScope("https://www.googleapis.com/auth/drive");
+        provider.addScope("https://www.googleapis.com/auth/documents");
+      }
 
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect_uri)}&response_type=token&scope=${encodeURIComponent(scopes)}&prompt=consent`;
-    
-    if (window.self !== window.top) {
-      addDebugLog("WARNING: Running inside a sandboxed iframe. Browser-level OAuth redirection might restrict cookie exchanges.");
-      addDebugLog("TIP: Click [Token Bypass Developer options] to copy-paste your Bearer token or open the application in a Standalone tab first!");
+      addDebugLog("Opening secure Google Sign-In authentication popup window...");
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      
+      if (!credential || !credential.accessToken) {
+        throw new Error("Failed to extract Google Access Token from Firebase auth credentials handoff.");
+      }
+
+      const token = credential.accessToken;
+      addDebugLog("Successfully authenticated and acquired Google API Access Token!");
+      
+      // Connect token to list files and download profile
+      await connectWithToken(token);
+    } catch (err: any) {
+      console.error("Popup OAuth Error: ", err);
+      const errorMsg = err.message || JSON.stringify(err);
+      addDebugLog(`Secure OAuth Flow Failed: ${errorMsg}`);
+      
+      if (errorMsg.includes("popup-closed-by-user") || errorMsg.includes("popup_closed_by_user")) {
+        setFeedback({ 
+          type: "info", 
+          message: "Secure sign-in popup closed. Please try again and keep the window open to authorize." 
+        });
+      } else {
+        setFeedback({ 
+          type: "error", 
+          message: `Google Login failed: ${errorMsg}. If popups are blocked, please enable them.` 
+        });
+      }
+    } finally {
+      setIsWorking(false);
     }
-
-    window.open(url, "_self");
   };
 
   const handleDisconnect = () => {
@@ -540,24 +576,73 @@ ${activeDeconstruction.deepDeduction || "N/A"}
           </div>
 
           {showManualInput && (
-            <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-4 space-y-2.5">
-              <span className="block text-[11px] font-mono text-slate-400">
-                To sign-in from safe development sandboxes (if popups are blocked inside iframe preview):
-              </span>
-              <div className="flex gap-2">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-4 space-y-4 font-mono text-xs">
+              <div className="space-y-1.5">
+                <span className="block text-[11px] font-bold text-slate-300">
+                  DEVELOPER / ADMIN CREDENTIAL TUNING OVERRIDES
+                </span>
+                <p className="text-[10px] text-slate-400 font-sans leading-relaxed">
+                  Customize the parameters below to configure your own Google Cloud Console OAuth App credentials if you want to bypass 403 authorization restrictions.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[10px] text-slate-400 uppercase font-bold">1. Custom GCP Client ID (معرف العميل):</label>
                 <input
-                  type="password"
-                  placeholder="Paste OAuth Access Token starting with 'ya29.'..."
-                  value={manualToken}
-                  onChange={(e) => setManualToken(e.target.value)}
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-1.5 font-mono text-xs text-white"
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => {
+                    const nextId = e.target.value.trim();
+                    setClientId(nextId);
+                    localStorage.setItem("logos_gworkspace_client_id", nextId);
+                  }}
+                  placeholder="Paste custom client ID..."
+                  className="w-full bg-slate-950 border border-slate-850 rounded px-3 py-2 text-xs text-slate-305"
                 />
+              </div>
+
+              <div className="space-y-2 border-t border-slate-900/80 pt-3 flex items-center justify-between gap-4">
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase font-bold">2. Request Broad drive/docs scopes:</label>
+                  <span className="text-[9px] text-slate-500 block font-sans">
+                    Enable only if your GCP Console project credentials have passed full OAuth validation. Disabling this resolves broad 403 restrictions by switching to unverified-friendly scopes.
+                  </span>
+                </div>
                 <button
-                  onClick={() => connectWithToken(manualToken)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 text-xs font-semibold rounded"
+                  type="button"
+                  onClick={() => {
+                    const next = !requestBroadScopes;
+                    setRequestBroadScopes(next);
+                    localStorage.setItem("logos_gworkspace_broad_scopes", next ? "true" : "false");
+                    addDebugLog(`Toggled oauth broad scopes request: ${next}`);
+                  }}
+                  className={`px-3 py-1.5 text-[10px] font-bold rounded border shrink-0 ${
+                    requestBroadScopes
+                      ? "bg-amber-950/40 border-amber-600/35 text-amber-400"
+                      : "bg-slate-950 border-slate-800 text-slate-400"
+                  }`}
                 >
-                  Confirm Token
+                  {requestBroadScopes ? "ENABLED (BROAD)" : "DISABLED (SAFE)"}
                 </button>
+              </div>
+
+              <div className="space-y-2 border-t border-slate-900/80 pt-3">
+                <label className="block text-[10px] text-slate-400 uppercase font-bold">3. Local Session Token Bypass:</label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder="Paste OAuth Access Token starting with 'ya29.'..."
+                    value={manualToken}
+                    onChange={(e) => setManualToken(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-[11px] text-white"
+                  />
+                  <button
+                    onClick={() => connectWithToken(manualToken)}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 text-xs font-semibold rounded shrink-0"
+                  >
+                    Confirm Token
+                  </button>
+                </div>
               </div>
             </div>
           )}
