@@ -1,0 +1,6 @@
+{
+  "name": "Logos_qr",
+  "description": "Advanced structural linguistics and conceptual deconstruction engine powered by generative AI and materialist Arabic etymology.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
