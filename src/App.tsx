@@ -410,10 +410,12 @@ Learning records are compiled and dynamically locked inside the current server i
   // Continuous timeline scroll with dynamic layout recalculation safety
   useEffect(() => {
     const scrollToEnd = () => {
-      timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      // Use 'auto' instead of 'smooth' so the browser can keep up with rapid text streaming
+      // 'smooth' on every character chunk causes extreme jitter and locks up the viewport.
+      timelineEndRef.current?.scrollIntoView({ behavior: "auto" });
     };
     scrollToEnd(); // Immediate scroll
-    const timer = setTimeout(scrollToEnd, 150); // Delayed scroll to catch layout animations
+    const timer = setTimeout(scrollToEnd, 50); // Delayed scroll
     return () => clearTimeout(timer);
   }, [messages, isLoading]);
 
@@ -1125,9 +1127,13 @@ Learning records are compiled and dynamically locked inside the current server i
                   )}
                 </div>
 
-                {/* Timeline continuous message list representation */}
-                <div className="space-y-4">
-                  {messages.map((msg) => (
+                  <div className="flex-1 overflow-y-auto mb-4 border border-slate-900 bg-slate-950/30 rounded-lg p-2 h-[calc(100vh-220px)] flex flex-col items-stretch space-y-4 shadow-inner custom-scrollbar relative">
+                    <style dangerouslySetInnerHTML={{__html: `
+                      .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                      .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 20px; }
+                    `}} />
+                    {messages.map((msg) => (
                     <div
                       key={msg.id}
                       className={`p-4 rounded-lg border leading-relaxed ${
@@ -1623,6 +1629,91 @@ Learning records are compiled and dynamically locked inside the current server i
               </div>
             </div>
 
+            {/* USER RUNTIME PARAMETERS */}
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col gap-3 shadow-md">
+              <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-300">
+                  <Sliders className="w-3.5 h-3.5 text-sky-400" />
+                  <span>RUNTIME PARAMETERS</span>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                {/* 2. Closed Coordinate Matrix Active (strictNullProtocol) slider switch */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1 cursor-pointer" onClick={() => setStrictNullProtocol(!strictNullProtocol)}>
+                    {strictNullProtocol ? "🔒 Matrix Filter" : "🌐 Spheroid Parse"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setStrictNullProtocol(!strictNullProtocol)}
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: strictNullProtocol ? '#10b981' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: strictNullProtocol ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+
+                {/* 3. Deep Thinking Mode toggle switch */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-indigo-400 font-mono flex items-center gap-1 cursor-pointer" onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}>
+                    <Brain className="w-3 h-3 text-indigo-400" />
+                    {useHighThinkingModel ? "🧠 Pro Core" : "⚡ Flash Core"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: useHighThinkingModel ? '#6366f1' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: useHighThinkingModel ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+
+                {/* 4. Automatic Chat Vocalizer (autoVocalize) switch */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-sky-400 font-mono flex items-center gap-1 cursor-pointer" onClick={() => setAutoVocalize(!autoVocalize)}>
+                    {autoVocalize ? "🗣️ Auto Voc" : "🔇 Voc Mute"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAutoVocalize(!autoVocalize)}
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: autoVocalize ? '#0ea5e9' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: autoVocalize ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+
+                {/* 5. English LTR target forceEnglish switch */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-amber-550 font-mono flex items-center gap-1 cursor-pointer" onClick={() => setForceEnglish(!forceEnglish)}>
+                    🇺🇸 {forceEnglish ? "English LTR" : "Symmetric AR/EN"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setForceEnglish(!forceEnglish)}
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: forceEnglish ? '#f59e0b' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: forceEnglish ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* SYSTEM METRIC MATRIX COLLAPSIBLE CONTROL */}
             <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col gap-3 shadow-md">
               <div className="flex items-center justify-between border-b border-slate-900 pb-2">
@@ -1700,7 +1791,7 @@ Learning records are compiled and dynamically locked inside the current server i
                   <div className="space-y-1.5 bg-[#090d1f]/40 p-2 rounded-md border border-slate-900/60">
                     <div className="flex justify-between items-center">
                       <span className="flex items-center gap-1.5 text-slate-300 font-semibold">
-                        <Mic className="w-3.5 h-3.5 text-sky-400" /> Vocalize Chat Pipe
+                        <Volume2 className="w-3.5 h-3.5 text-sky-400" /> Auto-TTS Audio Pipe
                       </span>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[9px] text-slate-500 font-sans">{autoVocalize ? "Speaking" : "Muted"}</span>
@@ -1793,100 +1884,10 @@ Learning records are compiled and dynamically locked inside the current server i
                 </span>
               </div>
 
-              {/* Toggles area for switches */}
-              <div className="flex items-center gap-3.5 flex-wrap">
-
-                {/* 2. Closed Coordinate Matrix Active (strictNullProtocol) slider switch */}
-                <div 
-                  className="flex items-center gap-2 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded cursor-pointer select-none"
-                  onClick={() => setStrictNullProtocol(!strictNullProtocol)}
-                  title="Toggle sandbox strict index file verification versus open general parameters"
-                >
-                  <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                    {strictNullProtocol ? "🔒 Matrix Filter" : "🌐 Spheroid Parse"}
-                  </span>
-                  <button
-                    type="button"
-                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                    style={{ backgroundColor: strictNullProtocol ? '#10b981' : '#334155' }}
-                  >
-                    <span
-                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                      style={{ transform: strictNullProtocol ? 'translateX(12px)' : 'translateX(0px)' }}
-                    />
-                  </button>
-                </div>
-
-                {/* 3. Deep Thinking Mode toggle switch */}
-                <div 
-                  className="flex items-center gap-2 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded cursor-pointer select-none"
-                  onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}
-                  title="Toggle cognitive pro thinking versus rapid real-time flash parser"
-                >
-                  <span className="text-[10px] text-indigo-400 font-mono flex items-center gap-1">
-                    <Brain className="w-3 h-3 text-indigo-400" />
-                    {useHighThinkingModel ? "🧠 Pro Core" : "⚡ Flash Core"}
-                  </span>
-                  <button
-                    type="button"
-                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                    style={{ backgroundColor: useHighThinkingModel ? '#6366f1' : '#334155' }}
-                  >
-                    <span
-                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                      style={{ transform: useHighThinkingModel ? 'translateX(12px)' : 'translateX(0px)' }}
-                    />
-                  </button>
-                </div>
-
-                {/* 4. Automatic Chat Vocalizer (autoVocalize) switch */}
-                <div 
-                  className="flex items-center gap-2 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded cursor-pointer select-none"
-                  onClick={() => setAutoVocalize(!autoVocalize)}
-                  title="Toggle automatic AI read aloud voice synthesizer"
-                >
-                  <span className="text-[10px] text-sky-400 font-mono flex items-center gap-1">
-                    {autoVocalize ? "🗣️ Auto Voc" : "🔇 Voc Mute"}
-                  </span>
-                  <button
-                    type="button"
-                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                    style={{ backgroundColor: autoVocalize ? '#0ea5e9' : '#334155' }}
-                  >
-                    <span
-                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                      style={{ transform: autoVocalize ? 'translateX(12px)' : 'translateX(0px)' }}
-                    />
-                  </button>
-                </div>
-
-                {/* 5. English LTR target forceEnglish switch */}
-                <div 
-                  className="flex items-center gap-2 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded cursor-pointer select-none"
-                  onClick={() => setForceEnglish(!forceEnglish)}
-                  title="Toggle English Translation output LTR mode"
-                >
-                  <span className="text-[10px] text-amber-550 font-mono flex items-center gap-1">
-                    🇺🇸 {forceEnglish ? "English LTR" : "Symmetric AR/EN"}
-                  </span>
-                  <button
-                    type="button"
-                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                    style={{ backgroundColor: forceEnglish ? '#f59e0b' : '#334155' }}
-                  >
-                    <span
-                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                      style={{ transform: forceEnglish ? 'translateX(12px)' : 'translateX(0px)' }}
-                    />
-                  </button>
-                </div>
-
-                {/* 6. English / Arabic bilingual flags badge */}
-                <div className="flex items-center gap-1 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded font-mono text-[9px] text-slate-500">
-                  <span>Alignment:</span>
-                  <span className="text-xs">{forceEnglish ? "🇺🇸 Only" : "🇺🇸 | 🇸🇦"}</span>
-                </div>
-
+              {/* 6. English / Arabic bilingual flags badge */}
+              <div className="flex items-center gap-1 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded font-mono text-[9px] text-slate-500">
+                <span>Alignment:</span>
+                <span className="text-xs">{forceEnglish ? "🇺🇸 Only" : "🇺🇸 | 🇸🇦"}</span>
               </div>
             </div>
 

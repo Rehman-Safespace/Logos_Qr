@@ -672,8 +672,14 @@ async function runRAGEngine(inputQuery: string): Promise<RAGQueryResult> {
       }
 
       if (score > 15) {
+        // Build a dynamic contextual chunk
+        const startChunkIdx = Math.max(0, index - 2);
+        const endChunkIdx = Math.min(lines.length - 1, index + 2);
+        const chunkLines = lines.slice(startChunkIdx, endChunkIdx + 1).map(l => l.trim()).filter(l => l);
+        const dynamicChunk = chunkLines.join(" | ");
+
         allScores.push({
-          verbatimVerse: trimmedLine,
+          verbatimVerse: dynamicChunk,
           sourceFile: doc.name,
           lineNumber,
           score
