@@ -654,8 +654,14 @@ Learning records are compiled and dynamically locked inside the current server i
         const audioSrc = `data:audio/wav;base64,${data.audio}`;
         const audio = new Audio(audioSrc);
         audio.onended = () => setIsPlayingId(null);
-        audio.play();
-        return;
+        
+        try {
+          await audio.play();
+          return;
+        } catch (playErr) {
+          console.warn("Audio playback blocked (likely user gesture constraint), checking fallback:", playErr);
+          setIsPlayingId(null);
+        }
       }
     } catch (err) {
       console.warn("Gemini Live TTS unavailable, falling back to instant browser SpeechSynthesis", err);

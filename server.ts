@@ -544,7 +544,26 @@ app.post("/api/tts", async (req, res) => {
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (base64Audio) {
-      res.json({ audio: base64Audio, format: "wav", sampleRate: 24000 });
+      // Decode raw PCM 16-bit 24000Hz and inject WAV RIFF header
+      const pcmData = Buffer.from(base64Audio, 'base64');
+      const header = Buffer.alloc(44);
+      
+      header.write('RIFF', 0);
+      header.writeUInt32LE(36 + pcmData.length, 4);
+      header.write('WAVE', 8);
+      header.write('fmt ', 12);
+      header.writeUInt32LE(16, 16);
+      header.writeUInt16LE(1, 20); // AudioFormat PCM
+      header.writeUInt16LE(1, 22); // NumChannels 1
+      header.writeUInt32LE(24000, 24); // SampleRate 24000
+      header.writeUInt32LE(24000 * 2, 28); // ByteRate
+      header.writeUInt16LE(2, 32); // BlockAlign 2
+      header.writeUInt16LE(16, 34); // BitsPerSample 16
+      header.write('data', 36);
+      header.writeUInt32LE(pcmData.length, 40);
+      
+      const wavBase64 = Buffer.concat([header, pcmData]).toString('base64');
+      res.json({ audio: wavBase64, format: "wav", sampleRate: 24000 });
     } else {
       res.status(500).json({ error: "Gemini TTS returned no audio payload. Using high-fidelity Web Speech browser synthesis engine." });
     }
