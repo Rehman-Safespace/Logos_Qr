@@ -121,7 +121,10 @@ function loadReferenceFilesFromDisk() {
         const defaults = referenceFiles.filter(df => df.id === "source-thermo" || df.id === "source-cyber" || df.id === "source-engine");
         const mergedList = [...defaults];
         filtered.forEach(item => {
-          if (!mergedList.some(d => d.id === item.id || d.name === item.name)) {
+          const existingIdx = mergedList.findIndex(d => d.id === item.id || d.name === item.name);
+          if (existingIdx !== -1) {
+            mergedList[existingIdx] = item;
+          } else {
             mergedList.push(item);
           }
         });
@@ -225,6 +228,24 @@ app.delete("/api/documents/:id", (req, res) => {
   referenceFiles = referenceFiles.filter(d => d.id !== id);
   saveReferenceFilesToDisk();
   res.json({ success: true, currentCount: referenceFiles.length });
+});
+
+// 5. PUT Edit Reference File
+app.put("/api/documents/:id", (req, res) => {
+  const { id } = req.params;
+  const { content } = req.body;
+  if (!content) {
+    return res.status(400).json({ error: "Document raw contents are required." });
+  }
+
+  const docIndex = referenceFiles.findIndex(d => d.id === id);
+  if (docIndex === -1) {
+    return res.status(404).json({ error: "Document not found." });
+  }
+
+  referenceFiles[docIndex].content = content;
+  saveReferenceFilesToDisk();
+  res.json({ success: true, document: { id: referenceFiles[docIndex].id, name: referenceFiles[docIndex].name, size: referenceFiles[docIndex].content.length, wordCount: referenceFiles[docIndex].content.split(/\s+/).length } });
 });
 
 // GET automated engine diagnosis report and save to reference list as physical tracker file
@@ -379,6 +400,13 @@ app.get("/api/documents", (req, res) => {
       source: d.source
     }))
   });
+});
+
+app.get("/api/documents/:id", (req, res) => {
+  const { id } = req.params;
+  const doc = referenceFiles.find(d => d.id === id);
+  if (!doc) return res.status(404).json({ error: "Document not found" });
+  res.json({ document: doc });
 });
 
 const memoryFilePath = path.join(process.cwd(), "logos_cognitive_memory.json");

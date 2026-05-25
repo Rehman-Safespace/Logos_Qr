@@ -40,6 +40,8 @@ export default function NullProtocolUpload({
     loadDocuments();
   }, []);
 
+  const [editedContent, setEditedContent] = useState("");
+
   // Sync back to parent when list changes
   const handleDocChange = () => {
     loadDocuments();
@@ -99,6 +101,33 @@ export default function NullProtocolUpload({
       }
     } catch (err) {
       console.error("Failed to unmount file ID: ", id);
+    }
+  };
+
+  // Save edits to reference file
+  const handleSaveEdit = async () => {
+    if (!selectedDoc) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/documents/${selectedDoc.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editedContent })
+      });
+      if (res.ok) {
+        const result = await res.json();
+        // Update the local state
+        const updatedDoc = { ...selectedDoc, content: editedContent, size: result.document.size, wordCount: result.document.wordCount };
+        setSelectedDoc(updatedDoc);
+        setDocuments(documents.map(d => d.id === selectedDoc.id ? updatedDoc : d));
+      } else {
+        const data = await res.json();
+        setErrorMsg(data.error || "Failed to update document.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to sync update.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -303,7 +332,22 @@ export default function NullProtocolUpload({
                   <div className="flex gap-2.5">
                     <button
                       type="button"
-                      onClick={() => setSelectedDoc(selectedDoc?.id === doc.id ? null : doc)}
+                      onClick={async () => {
+                        if (selectedDoc?.id === doc.id) {
+                          setSelectedDoc(null);
+                        } else {
+                          try {
+                            const res = await fetch(`/api/documents/${doc.id}`);
+                            if (res.ok) {
+                              const data = await res.json();
+                              setSelectedDoc(data.document);
+                              setEditedContent(data.document.content || "");
+                            }
+                          } catch (e) {
+                            console.error("Failed to load document content", e);
+                          }
+                        }
+                      }}
                       className="text-slate-400 hover:text-white transition"
                       title="View contents"
                     >
@@ -328,20 +372,38 @@ export default function NullProtocolUpload({
       {/* Embedded Document content viewer */}
       {selectedDoc && (
         <div className="mt-4 bg-slate-950 border border-slate-900 rounded p-3">
-          <div className="flex justify-between items-center mb-1 pb-1 border-b border-slate-900">
+          <div className="flex justify-between items-center mb-2 pb-1 border-b border-slate-900">
             <span className="text-[10px] uppercase font-bold text-emerald-400 font-mono">
               Vector Code Explorer: {selectedDoc.name}
             </span>
-            <button
-              onClick={() => setSelectedDoc(null)}
-              className="text-slate-500 hover:text-slate-300 text-[10px]"
-            >
-              [Hide]
-            </button>
+            <div className="flex gap-2 items-center">
+              {selectedDoc.id !== "doc-memory-sync" && (
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={isLoading || editedContent === selectedDoc.content}
+                  className={`text-[10px] px-2 py-0.5 rounded border transition-all ${
+                    editedContent !== selectedDoc.content
+                      ? "bg-emerald-950/40 text-emerald-400 border-emerald-800 hover:bg-emerald-900/60"
+                      : "bg-slate-900 text-slate-500 border-slate-800 cursor-not-allowed"
+                  }`}
+                >
+                  {isLoading ? "Saving..." : "Save Changes"}
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedDoc(null)}
+                className="text-slate-500 hover:text-slate-300 text-[10px]"
+              >
+                [Hide]
+              </button>
+            </div>
           </div>
-          <pre className="text-[10px] text-slate-400 font-mono overflow-auto max-h-36 whitespace-pre-wrap leading-relaxed py-1">
-            {selectedDoc.content}
-          </pre>
+          <textarea 
+            value={editedContent}
+            onChange={(e) => setEditedContent(e.target.value)}
+            readOnly={selectedDoc.id === "doc-memory-sync"}
+            className="w-full text-[10px] text-slate-400 font-mono overflow-auto h-48 whitespace-pre-wrap leading-relaxed py-1 bg-transparent border-none focus:outline-none resize-y"
+          />
         </div>
       )}
     </div>

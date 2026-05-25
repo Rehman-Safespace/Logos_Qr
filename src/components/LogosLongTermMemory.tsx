@@ -105,6 +105,7 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
                  });
                  setMemories(merged);
                  localStorage.setItem("logos_longterm_memory", JSON.stringify(merged));
+                 syncToServer(merged);
                  
                  const dynamicDirectives = merged.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
                  onInjectMemoryDirectives(dynamicDirectives);
@@ -122,6 +123,21 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
       setGdriveToken(token);
     }
   }, []);
+
+  const syncToServer = async (mems: MemoryNode[]) => {
+    setIsSyncing(true);
+    try {
+      await fetch('/api/memory-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memories: mems })
+      });
+    } catch (e) {
+      console.error("Failed to dual-sync to backend", e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Sync token checks periodically from window session storage
   useEffect(() => {
@@ -150,6 +166,7 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
     const updatedMemories = [...memories, nNode];
     setMemories(updatedMemories);
     localStorage.setItem("logos_longterm_memory", JSON.stringify(updatedMemories));
+    syncToServer(updatedMemories);
     
     const directives = updatedMemories.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
     onInjectMemoryDirectives(directives);
@@ -171,6 +188,7 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
     const updatedMemories = memories.filter(m => m.key !== key);
     setMemories(updatedMemories);
     localStorage.setItem("logos_longterm_memory", JSON.stringify(updatedMemories));
+    syncToServer(updatedMemories);
     
     const directives = updatedMemories.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
     onInjectMemoryDirectives(directives);
@@ -221,6 +239,7 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
     if (joinedCount > 0) {
       setMemories(newMemories);
       localStorage.setItem("logos_longterm_memory", JSON.stringify(newMemories));
+      syncToServer(newMemories);
       
       const directives = newMemories.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
       onInjectMemoryDirectives(directives);
@@ -235,6 +254,7 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
   const saveAndApplyMemories = async (mems: MemoryNode[]) => {
     setMemories(mems);
     localStorage.setItem("logos_longterm_memory", JSON.stringify(mems));
+    syncToServer(mems);
     
     const directives = mems.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
     onInjectMemoryDirectives(directives);

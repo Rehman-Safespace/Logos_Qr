@@ -55,12 +55,14 @@ The client interface is styled with a high-contrast Slate/Obsidian dark-mode lay
    - As the user types their input, a listening loop analyzes strings on the fly.
    - It automatically predicts the mode: single standard terms default to **Mode A** (Word Deconstruction), whereas hyphen-delimited structures or space-separated individual characters (e.g., `ح-س-ب` or `ح س ب`) automatically switch the application to **Mode B** (Root Derivational Generation).
    - Simultaneously, it performs deep substring scanning across all mounted custom files. Finding a lexical overlap toggles **Strict Closed Matrix Mode** automatically, guaranteeing source anchoring.
-3. **Runtime Parameters & System Preferences:**
+ 3. **Runtime Parameters & System Preferences:**
    - Realtime toggle switches for strict matrix filtering, cognitive core selection, automatic chat vocalization (with adjustable speech velocity / rate slider), and LTR alignment mode.
-4. **Google Workspace Sync (`WorkspaceSync.tsx`):**
+ 4. **Google Workspace Sync (`WorkspaceSync.tsx`):**
    - Accesses standard Google Drive and Google Docs APIs client-side.
    - Supports exporting active linguistic deconstructions into polished, structured Google Docs with customizable document formatting.
    - Includes real-time listing, searching, and eviction (deletion) of cognitive keep notes synchronized under the local project state.
+ 5. **Null Protocol Vector Matrix Editing (`NullProtocolUpload.tsx`):**
+   - Directly allows users to upload, mount, edit, read, and delete RAG indices natively inside the interface via direct API puts (`/api/documents/:id`) updating dynamically to the disk array `logos_reference_files.json`.
 
 ### 3.2 The Backend Layer (`server.ts` & Express)
 The custom NodeJS server runs direct full-stack routing and proxies all API keys to remain safe from browser inspector tools.

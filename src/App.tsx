@@ -700,18 +700,6 @@ Learning records are compiled and dynamically locked inside the current server i
             <Clock className="w-3.5 h-3.5 text-slate-500" />
             <span>{currentTime}</span>
           </div>
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className={`flex items-center gap-1.5 border px-2.5 py-1 rounded transition-all text-[11px] ${
-              isSidebarCollapsed
-                ? "bg-emerald-950/30 border-emerald-500/40 text-emerald-300 font-medium"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-250 hover:border-slate-700"
-            }`}
-            title={isSidebarCollapsed ? "Switch to Standard layout" : "Collapse side widgets for extra calm focus"}
-          >
-            {isSidebarCollapsed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            <span>{isSidebarCollapsed ? "Relaxed Layout" : "Standard View"}</span>
-          </button>
 
           <button
             onClick={handleExportTimeline}
@@ -726,13 +714,127 @@ Learning records are compiled and dynamically locked inside the current server i
       {/* Main Structural Grid Section / Workspace Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-28">
         
-        {/* LEFT COMPONENT: Scrollable Chat Terminal (Occupies 8 or 12 columns) */}
+        {/* Scrollable Chat Terminal / Main Layout */}
         <section 
           id="logos-scrolling-timeline" 
-          className={`flex flex-col gap-5 min-h-[500px] transition-all duration-300 ${
-            isSidebarCollapsed ? "lg:col-span-12" : "lg:col-span-8"
-          }`}
+          className="flex flex-col gap-5 min-h-[500px] w-full lg:col-span-12"
         >
+          {/* TOP PARAMETER BAR (Above Output) */}
+          <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col md:flex-row items-center gap-6 shadow-md w-full">
+            
+            {/* The Neural Expressive Spheroid (Now compact) */}
+            <div className="flex items-center gap-4 shrink-0">
+              <div className="w-16 h-16 shrink-0">
+                <ArabesqueMandala isLoading={isLoading} activityLevel={activityLevel} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-mono tracking-wider text-slate-500 uppercase">
+                  Spheroid Node
+                </span>
+                <span className="font-sans font-semibold text-xs text-slate-300">
+                  Linguistic Alignment
+                </span>
+              </div>
+            </div>
+
+            {/* Container for Runtime Toggles - Fill rest of space */}
+            <div className="flex-1 flex flex-wrap items-center gap-x-6 gap-y-3 justify-end md:pl-6 md:border-l md:border-slate-800">
+              
+              {/* Matrix Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-mono tracking-tight cursor-pointer" onClick={() => setStrictNullProtocol(!strictNullProtocol)}>
+                  {strictNullProtocol ? "🔒 Matrix Filter" : "🌐 Spheroid Parse"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setStrictNullProtocol(!strictNullProtocol)}
+                  className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                  style={{ backgroundColor: strictNullProtocol ? '#10b981' : '#334155' }}
+                >
+                  <span
+                    className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                    style={{ transform: strictNullProtocol ? 'translateX(12px)' : 'translateX(0px)' }}
+                  />
+                </button>
+              </div>
+
+              {/* Engine Core */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-indigo-400 font-mono tracking-tight cursor-pointer" onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}>
+                  {useHighThinkingModel ? "🧠 Pro Core" : "⚡ Flash Core"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}
+                  className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                  style={{ backgroundColor: useHighThinkingModel ? '#6366f1' : '#334155' }}
+                >
+                  <span
+                    className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                    style={{ transform: useHighThinkingModel ? 'translateX(12px)' : 'translateX(0px)' }}
+                  />
+                </button>
+              </div>
+
+              {/* English LTR */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-amber-550 font-mono tracking-tight cursor-pointer" onClick={() => setForceEnglish(!forceEnglish)}>
+                  🇺🇸 {forceEnglish ? "English LTR" : "Symmetric AR/EN"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setForceEnglish(!forceEnglish)}
+                  className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                  style={{ backgroundColor: forceEnglish ? '#f59e0b' : '#334155' }}
+                >
+                  <span
+                    className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                    style={{ transform: forceEnglish ? 'translateX(12px)' : 'translateX(0px)' }}
+                  />
+                </button>
+              </div>
+
+              {/* Auto Vocalizer & Speech Rate */}
+              <div className="flex items-center gap-4 border border-slate-900 bg-slate-900/50 rounded-md px-2 py-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-sky-400 font-mono tracking-tight cursor-pointer" onClick={() => setAutoVocalize(!autoVocalize)}>
+                    {autoVocalize ? "🗣️ Auto Voc" : "🔇 Voc Mute"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAutoVocalize(!autoVocalize)}
+                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
+                    style={{ backgroundColor: autoVocalize ? '#0ea5e9' : '#334155' }}
+                  >
+                    <span
+                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
+                      style={{ transform: autoVocalize ? 'translateX(12px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+                
+                <div className="h-4 w-px bg-slate-800" />
+                
+                <div className="flex flex-col w-20">
+                  <div className="flex justify-between text-[8px] text-slate-500 mb-0.5">
+                    <span>Rate</span>
+                    <span>{speechRate}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2"
+                    step="0.05"
+                    value={speechRate}
+                    onChange={(e) => setSpeechRate(Number(e.target.value))}
+                    className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 transition"
+                  />
+                </div>
+              </div>
+
+            </div>
+          </div>
+
           {/* Quick Tab Header buttons */}
           <div className="flex flex-wrap sm:flex-nowrap bg-slate-950 p-1 rounded-lg border border-slate-900 gap-1">
             <button
@@ -1617,283 +1719,7 @@ Learning records are compiled and dynamically locked inside the current server i
           </AnimatePresence>
         </section>
 
-        {/* RIGHT COMPONENT: Spheroid Controls (Occupies 4 columns, hidden in Relaxed Mode) */}
-        {!isSidebarCollapsed && (
-          <aside className="lg:col-span-4 flex flex-col gap-5 lg:sticky lg:top-20">
-            
-            {/* Spheroid Mandala Node */}
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-5 flex flex-col items-center justify-center shadow-md">
-              <span className="text-[10px] font-mono tracking-wider text-slate-500 uppercase mb-2">
-                Neural Expressive Aesthetic Spheroid
-              </span>
-              <ArabesqueMandala isLoading={isLoading} activityLevel={activityLevel} />
-              <div className="mt-3 text-center">
-                <span className="font-sans font-semibold text-xs text-slate-300">
-                  Linguistic Symmetrical Alignment
-                </span>
-                <p className="text-[10px] text-slate-500 mt-1 max-w-[220px] leading-snug">
-                  Rotating proportional to system clock frequencies. Arabesque symmetries represent high-resolution distinction.
-                </p>
-              </div>
-            </div>
 
-            {/* USER RUNTIME PARAMETERS */}
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col gap-3 shadow-md">
-              <div className="flex items-center justify-between border-b border-slate-900 pb-2">
-                <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-300">
-                  <Sliders className="w-3.5 h-3.5 text-sky-400" />
-                  <span>RUNTIME PARAMETERS</span>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                {/* 2. Closed Coordinate Matrix Active (strictNullProtocol) slider switch */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1 cursor-pointer" onClick={() => setStrictNullProtocol(!strictNullProtocol)}>
-                    {strictNullProtocol ? "🔒 Matrix Filter" : "🌐 Spheroid Parse"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setStrictNullProtocol(!strictNullProtocol)}
-                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                    style={{ backgroundColor: strictNullProtocol ? '#10b981' : '#334155' }}
-                  >
-                    <span
-                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                      style={{ transform: strictNullProtocol ? 'translateX(12px)' : 'translateX(0px)' }}
-                    />
-                  </button>
-                </div>
-
-                {/* 3. Deep Thinking Mode toggle switch */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-indigo-400 font-mono flex items-center gap-1 cursor-pointer" onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}>
-                    <Brain className="w-3 h-3 text-indigo-400" />
-                    {useHighThinkingModel ? "🧠 Pro Core" : "⚡ Flash Core"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setUseHighThinkingModel(!useHighThinkingModel)}
-                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                    style={{ backgroundColor: useHighThinkingModel ? '#6366f1' : '#334155' }}
-                  >
-                    <span
-                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                      style={{ transform: useHighThinkingModel ? 'translateX(12px)' : 'translateX(0px)' }}
-                    />
-                  </button>
-                </div>
-
-                {/* 4. Automatic Chat Vocalizer (autoVocalize) switch */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-sky-400 font-mono flex items-center gap-1 cursor-pointer" onClick={() => setAutoVocalize(!autoVocalize)}>
-                    {autoVocalize ? "🗣️ Auto Voc" : "🔇 Voc Mute"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAutoVocalize(!autoVocalize)}
-                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                    style={{ backgroundColor: autoVocalize ? '#0ea5e9' : '#334155' }}
-                  >
-                    <span
-                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                      style={{ transform: autoVocalize ? 'translateX(12px)' : 'translateX(0px)' }}
-                    />
-                  </button>
-                </div>
-
-                {/* 5. English LTR target forceEnglish switch */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-amber-550 font-mono flex items-center gap-1 cursor-pointer" onClick={() => setForceEnglish(!forceEnglish)}>
-                    🇺🇸 {forceEnglish ? "English LTR" : "Symmetric AR/EN"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setForceEnglish(!forceEnglish)}
-                    className="relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                    style={{ backgroundColor: forceEnglish ? '#f59e0b' : '#334155' }}
-                  >
-                    <span
-                      className="pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                      style={{ transform: forceEnglish ? 'translateX(12px)' : 'translateX(0px)' }}
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* SYSTEM METRIC MATRIX COLLAPSIBLE CONTROL */}
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col gap-3 shadow-md">
-              <div className="flex items-center justify-between border-b border-slate-900 pb-2">
-                <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-300">
-                  <Activity className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                  <span>SYSTEM METRIC MATRIX</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Engine core is active and connected" />
-                  <button
-                    onClick={() => setIsMetricsCollapsed(!isMetricsCollapsed)}
-                    className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-900 rounded font-mono text-[9px] flex items-center gap-0.5 border border-slate-900 transition"
-                  >
-                    {isMetricsCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-                    <span>{isMetricsCollapsed ? "Unhide" : "Hide"}</span>
-                  </button>
-                </div>
-              </div>
-
-              {isMetricsCollapsed ? (
-                /* Collapsed micro badges display */
-                <div className="flex flex-wrap gap-1.5 py-1">
-                  <span className="text-[9px] font-mono bg-[#0c1020] text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-950/40" title="Primary core mode">
-                    🧠 {useHighThinkingModel ? "Pro" : "Flash"}
-                  </span>
-                  <span className="text-[9px] font-mono bg-[#0c1020] text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-950/40" title="RAG reference files">
-                    🔒 RAG: {strictNullProtocol ? "Strict" : "Hybrid"}
-                  </span>
-                  <span className="text-[9px] font-mono bg-[#0c1020] text-sky-300 px-1.5 py-0.5 rounded border border-sky-950/40" title="Vocalizer chat mode">
-                    🗣️ {autoVocalize ? "ON" : "OFF"}
-                  </span>
-                  <span className="text-[9px] font-mono bg-[#0c1020] text-amber-300 px-1.5 py-0.5 rounded border border-amber-950/40" title="Output target translation text">
-                    🇺🇸 LTR: {forceEnglish ? "ENG" : "SYM"}
-                  </span>
-                </div>
-              ) : (
-                /* Expanded fully detailed and interactive parameters with symbol icons/badges */
-                <div className="space-y-3.5 font-mono text-[10px] text-slate-400">
-                  
-                  {/* Primary Engine Core with dynamic toggle details */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px] text-slate-300">
-                      <span className="flex items-center gap-1.5 font-semibold">
-                        <Brain className="w-3.5 h-3.5 text-indigo-400" /> Core Engine Model
-                      </span>
-                      <span className="text-indigo-300 font-bold bg-[#0c1020] px-1.5 py-0.5 rounded border border-indigo-950/40">
-                        {useHighThinkingModel ? "Gemini Pro" : "Gemini Flash"}
-                      </span>
-                    </div>
-                    <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
-                      {useHighThinkingModel 
-                        ? "Executing deep cognitive semantic parsing. Aided by multi-tier fallback chain reasoning." 
-                        : "Executing lightning-fast context alignments. Lower latency response cycles."}
-                    </p>
-                  </div>
-
-                  {/* RAG Sourced File Indexer State info */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px] text-slate-300">
-                      <span className="flex items-center gap-1.5 font-semibold">
-                        <FileText className="w-3.5 h-3.5 text-emerald-400" /> Sourced RAG Engine
-                      </span>
-                      <span className="text-emerald-400 font-bold bg-[#0c1020] px-1.5 py-0.5 rounded border border-emerald-950/40">
-                        {strictNullProtocol ? "Strict Files" : "Hybrid Parse"}
-                      </span>
-                    </div>
-                    <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
-                      {strictNullProtocol 
-                        ? "Requires 100% exact matching index file constraints [Anti-Hallucination active]." 
-                        : "Synthesizes outer models knowledge space with reference index matrix guidelines."}
-                    </p>
-                  </div>
-
-                  {/* TTS Vocalizer Switch Controller slider */}
-                  <div className="space-y-1.5 bg-[#090d1f]/40 p-2 rounded-md border border-slate-900/60">
-                    <div className="flex justify-between items-center">
-                      <span className="flex items-center gap-1.5 text-slate-300 font-semibold">
-                        <Volume2 className="w-3.5 h-3.5 text-sky-400" /> Auto-TTS Audio Pipe
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-slate-500 font-sans">{autoVocalize ? "Speaking" : "Muted"}</span>
-                        <button
-                          type="button"
-                          onClick={() => setAutoVocalize(!autoVocalize)}
-                          className="relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                          style={{ backgroundColor: autoVocalize ? '#0ea5e9' : '#334155' }}
-                        >
-                          <span
-                            className="pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                            style={{ transform: autoVocalize ? 'translateX(10px)' : 'translateX(0px)' }}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
-                      Vocalizes user inputs and deconstruction outputs automatically via TTS synthesis vector.
-                    </p>
-                    
-                    {/* Speech Rate sub-control */}
-                    <div className="pt-2 pl-5">
-                      <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                        <span>Speech Velocity: {speechRate}x</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="2"
-                        step="0.05"
-                        value={speechRate}
-                        onChange={(e) => setSpeechRate(Number(e.target.value))}
-                        className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 transition"
-                      />
-                      <div className="flex justify-between text-[8px] text-slate-600 mt-1">
-                        <span>0.5x</span>
-                        <span>1x</span>
-                        <span>2x</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* RTL symmetry parser with Force English toggle */}
-                  <div className="space-y-1.5 bg-[#090d1f]/40 p-2 rounded-md border border-slate-900/60">
-                    <div className="flex justify-between items-center">
-                      <span className="flex items-center gap-1.5 text-slate-300 font-semibold">
-                        <Globe className="w-3.5 h-3.5 text-amber-400" /> Context: English LTR
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-slate-500 font-sans">{forceEnglish ? "English LTR" : "Symmetrical"}</span>
-                        <button
-                          type="button"
-                          onClick={() => setForceEnglish(!forceEnglish)}
-                          className="relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out bg-slate-800"
-                          style={{ backgroundColor: forceEnglish ? '#f59e0b' : '#334155' }}
-                        >
-                          <span
-                            className="pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
-                            style={{ transform: forceEnglish ? 'translateX(10px)' : 'translateX(0px)' }}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
-                      {forceEnglish 
-                        ? "Forces target output translation fully into English. Eliminates bilingual Arabic descriptions block." 
-                        : "Delivers symmetrical Arabic blocks with separate isolated English text lines."}
-                    </p>
-                  </div>
-
-                  {/* Network Anchor spec */}
-                  <div className="flex justify-between items-center border-t border-slate-900 pt-2 text-slate-500">
-                    <span>Matrix Anchoring Guard:</span>
-                    <span className="text-emerald-400/90 font-bold tracking-wider flex items-center gap-0.5">
-                      ● ONLINE-REFS
-                    </span>
-                  </div>
-
-                </div>
-              )}
-            </div>
-
-            {/* Help & definitions card */}
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-slate-900">
-                <HelpCircle className="w-4 h-4 text-slate-400" />
-                <span className="text-xs uppercase font-sans font-bold tracking-wider text-slate-300">Linguistic Framework</span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed leading-snug">
-                Materialist Arabic etymology isolates pure physical movement signatures. Roots are treated as specific directions of force or mass coordination inside thermodynamics rather than dogmatic metaphors.
-              </p>
-            </div>
-          </aside>
-        )}
       </main>
 
       {/* FIXED ANCHORED INPUT TERMINAL AT BOTTOM */}

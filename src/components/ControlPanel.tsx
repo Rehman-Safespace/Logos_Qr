@@ -171,7 +171,7 @@ export default function ControlPanel({ onDirectivesSaved }: ControlPanelProps) {
       {!isAuthenticated ? (
         <form onSubmit={handleUnlock} className="flex flex-col gap-3.5 max-w-xl">
           <p className="text-slate-400 text-xs leading-relaxed">
-            To edit, overwrite, or add operational logic elements inside this container, authenticate with the system master passcode (Default: <strong className="text-amber-500">LOGOS-9</strong>), or instantly verify using your Google Workspace Admin account:
+            To edit, overwrite, or add operational logic elements inside this container, authenticate with the system master passcode, or instantly verify using your Google Workspace Admin account:
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 flex gap-2">
