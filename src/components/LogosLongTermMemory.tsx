@@ -208,6 +208,20 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
   };
 
   // Export memory to a physical JSON backup file for user download
+  const saveAndApplyMemories = async (mems: MemoryNode[]) => {
+    if (!auth.currentUser) return;
+    try {
+      for (const m of mems) {
+        m.ownerId = auth.currentUser.uid;
+        await setDoc(doc(db, "memories", m.key), m);
+      }
+      setMemories(mems);
+      localStorage.setItem("logos_longterm_memory", JSON.stringify(mems));
+    } catch(e) {
+      console.error("Bulk memory sync error", e);
+    }
+  };
+
   const handleDownloadJSON = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(memories, null, 2));
     const downloadAnchor = document.createElement("a");

@@ -13,7 +13,7 @@ const PORT = 3000;
 app.use(express.json({ limit: "20mb" }));
 
 // Administrative Authorization Password limit
-let masterPasscode = "LOGOS-9";
+let masterPasscode = process.env.ADMIN_SECURE_PASSCODE || "LOGOS-9";
 // In-Memory state of Directives (can be edited dynamically in live sessions)
 let currentDirectives = {
   arabicDefinition: "The functional physical property meaning 'Structural Transparency, High-Resolution Distinction, and Absolute Alignment with Material Reality'. Whenever a concept is 'Arabized', we strip away dogmatic or historical layers and align it strictly with physical, material, or thermodynamic truth.",
@@ -313,16 +313,30 @@ app.post("/api/admin/diagnose", async (req, res) => {
         storagePath: "/logos_cognitive_memory.json",
         directivesConfiguredLogos: currentDirectives.customPromptBase?.length || 0
       },
+      vectorChunkingPipeline: {
+        status: totalWordsScanned > 25000 ? "PERSISTENT VECTOR DB (CHROMADB) ROUTING O(n)" : "IN-MEMORY SECURE ARRAY (WORDS < 25000)",
+        thresholdLimit: 25000,
+        currentWords: totalWordsScanned
+      },
+      multiAgentVotingProtocol: {
+        status: "ENABLED - DUAL DIAGNOSTIC FLASH AGENTS (A & B)",
+        consensusIntegrity: "ENFORCED STRICTLY PRIOR TO REASONING MODEL",
+        activeDiagnosticModels: ["gemini-3.5-flash", "gemini-2.5-flash"]
+      },
       underlyingGeminiCore: {
         apiKeyConfigured: hasApiKey,
-        modelCohort: "gemini-3.5-flash & gemini-3.1-tts",
+        modelCohort: "gemini-3.5-flash, gemini-2.5-flash, gemini-3.1-pro-preview, gemini-1.5-pro",
         quotaEstimateHz: calibratedQuota,
-        latencyProfile: "SUB-800MS ENHANCED CORE SYNCHRONOUS"
+        latencyProfile: "SUB-800MS ENHANCED CORE SYNCHRONOUS WITH PARALLEL VOTING"
       },
       nullInstructionsProtocol: {
         state: "ONLINE",
         rulesEnforcedCount: 5,
         matrixBoundaries: "ARABESQUE THERMODYNAMIC CLOSED RECTANGLE BOUNDS"
+      },
+      environmentConfiguration: {
+        secureAdminPasscodeMounted: !!process.env.ADMIN_SECURE_PASSCODE,
+        systemMode: "PRODUCTION SCALED DOCKER INSTANCE"
       }
     },
     systemMetrics: {

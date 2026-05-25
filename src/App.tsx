@@ -39,7 +39,9 @@ import {
   GitBranch,
   Globe,
   FileText,
-  Sliders
+  Sliders,
+  Server,
+  Lock
 } from "lucide-react";
 import RootRelationshipGraph from "./components/RootRelationshipGraph";
 
@@ -972,6 +974,62 @@ Learning records are compiled and dynamically locked inside the current server i
                             </div>
                             <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 truncate">
                               Associated diagnostic file: {diagnosticReport.checks?.sourcedFilesSystem?.files?.slice(-1)[0]?.name || "report.json"}
+                            </div>
+                          </div>
+
+                          {/* Card 4: System Architectural Scale & Protocol Integrations */}
+                          <div className="bg-[#020617] border border-slate-900 p-4 rounded-lg space-y-3.5 flex flex-col justify-between col-span-1 md:col-span-2">
+                            <div className="space-y-3">
+                              <div className="text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-900 pb-1.5 flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  <Server className="w-3.5 h-3.5 text-purple-400" /> 
+                                  SYSTEM ARCHITECTURAL SCALE & PROTOCOLS
+                                </span>
+                                <span className={diagnosticReport.checks?.environmentConfiguration?.systemMode === "PRODUCTION SCALED DOCKER INSTANCE" ? "text-emerald-400 font-bold text-[9px] bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-900/30" : "text-amber-500 font-bold text-[9px]"}>
+                                  {diagnosticReport.checks?.environmentConfiguration?.systemMode || "RUNTIME INSTANCE"}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-2 pt-1">
+                                <div className="space-y-2.5">
+                                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px]">🧠 Multi-Agent Voting Pipeline</span>
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-slate-400">Status:</span>
+                                    <span className="text-emerald-400 overflow-hidden text-ellipsis whitespace-nowrap ml-2" title={diagnosticReport.checks?.multiAgentVotingProtocol?.status}>{diagnosticReport.checks?.multiAgentVotingProtocol?.status}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-slate-400">Diagnostic Array:</span>
+                                    <span className="text-slate-300 font-mono text-[9px]">{diagnosticReport.checks?.multiAgentVotingProtocol?.activeDiagnosticModels?.join(" + ")}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-slate-400">Consensus:</span>
+                                    <span className="text-purple-400 text-[8px] max-w-[120px] text-right leading-tight">{diagnosticReport.checks?.multiAgentVotingProtocol?.consensusIntegrity}</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2.5 border-t border-slate-900 md:border-t-0 md:border-l md:pl-3 pt-3 md:pt-0">
+                                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px]">🗂️ Vector Chunking Array</span>
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-slate-400">Status:</span>
+                                    <span className="text-sky-400 text-[8px] text-right max-w-[120px] leading-tight" title={diagnosticReport.checks?.vectorChunkingPipeline?.status}>{diagnosticReport.checks?.vectorChunkingPipeline?.status}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-slate-400">Current Scope:</span>
+                                    <span className="text-slate-300 font-mono text-[9px]">{diagnosticReport.checks?.vectorChunkingPipeline?.currentWords} Words</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-slate-400">Threshold:</span>
+                                    <span className="text-rose-400 font-mono text-[9px]">{diagnosticReport.checks?.vectorChunkingPipeline?.thresholdLimit} Words</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 flex items-center justify-between">
+                              <span className="flex items-center gap-1">
+                                <Lock className="w-3 h-3 text-emerald-400" />
+                                ENV SECURE VARS: {diagnosticReport.checks?.environmentConfiguration?.secureAdminPasscodeMounted ? "MOUNTED GLOBALLY" : "NOT FOUND"}
+                              </span>
+                              <span>Engine Model Cohort Integrations Actively Monitoring</span>
                             </div>
                           </div>
                         </div>

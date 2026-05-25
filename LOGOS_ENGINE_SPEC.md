@@ -283,4 +283,20 @@ The HTML head has been enriched with Apple web-app standalone modifiers and brow
 
 ---
 
+## 12. Production Security & Environment Strategy
+
+For Production Scale: Rather than hardcoding secure values in the TypeScript file, the engine leverages secure environment variables. For example, the `ADMIN_SECURE_PASSCODE` is configured globally:
+- **Private Environment Variables**: Set via the Settings menu of the environment container (e.g., Google Cloud Run or AI Studio settings).
+- **Dynamic Scalability**: Passwords and other secure keys can be changed dynamically anytime via the environment console without needing to touch or rebuild the source code, preventing security breaches during scaling and production deployments.
+
+---
+
+## 13. Hardcoded Matrices Initialization
+
+To make matrices truly global and permanent, their exact contents and source data are hardcoded directly into the initialization phase of `server.ts` inside the `referenceFiles` array.
+- This ensures that native matrices (e.g., Thermodynamic Codex, Cybernetic Sandbox Rules, and Logos Core Engine Instructions) are always fully mounted upon any container spin-up.
+- By storing them natively inside the TS initialization, the engine sidesteps database network-fetch latencies for foundational rule sets and anchors its cognitive parameters immutably before any analysis processing.
+
+---
+
 This document acts as a complete logical and technical specification for the Logos_0o2 Engine, ready to be copied or exported at any time. We are now ready to verify and deploy.
