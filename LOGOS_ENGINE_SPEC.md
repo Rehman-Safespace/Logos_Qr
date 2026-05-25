@@ -55,7 +55,9 @@ The client interface is styled with a high-contrast Slate/Obsidian dark-mode lay
    - As the user types their input, a listening loop analyzes strings on the fly.
    - It automatically predicts the mode: single standard terms default to **Mode A** (Word Deconstruction), whereas hyphen-delimited structures or space-separated individual characters (e.g., `ح-س-ب` or `ح س ب`) automatically switch the application to **Mode B** (Root Derivational Generation).
    - Simultaneously, it performs deep substring scanning across all mounted custom files. Finding a lexical overlap toggles **Strict Closed Matrix Mode** automatically, guaranteeing source anchoring.
-3. **Google Workspace Sync (`WorkspaceSync.tsx`):**
+3. **Runtime Parameters & System Preferences:**
+   - Realtime toggle switches for strict matrix filtering, cognitive core selection, automatic chat vocalization (with adjustable speech velocity / rate slider), and LTR alignment mode.
+4. **Google Workspace Sync (`WorkspaceSync.tsx`):**
    - Accesses standard Google Drive and Google Docs APIs client-side.
    - Supports exporting active linguistic deconstructions into polished, structured Google Docs with customizable document formatting.
    - Includes real-time listing, searching, and eviction (deletion) of cognitive keep notes synchronized under the local project state.
@@ -111,7 +113,7 @@ The application implements a multi-write persistence model for cognitive insight
 
 ### Memory Synchronization Path
 When an insightful root is recorded, the application processes the write task simultaneously across four logical boundaries:
-1. **Client Space Memory Indices:** Local React state updates inside `LogosLongTermMemory.tsx` to maintain instant visual updates.
+1. **Client Space Memory Indices:** Local React state updates inside `LogosLongTermMemory.tsx` to maintain instant visual updates. This is also synced to local storage to persist the cognitive data on the same browser device immediately, and injected automatically as cognitive directions to the language models.
 2. **Google Cloud Firestore Database:** Written securely to remote Cloud instances under the user's authenticating ID context (creating the collection `/keep_notes` structure).
 3. **Server-Side File Persistence (`logos_cognitive_memory.json`):** Committed directly to the server's disk space using node `fs.writeFileSync` in a beautiful formatted array.
 4. **Active RAG Search Ingestion:** The server dynamically converts the full list of saved memories on disk into raw searchable lines (formatted as `- الجذر [Root]: [Insight] (Recorded: Timestamp)`) and mounts them directly into the live **NULL Protocol Docs Index**. The AI engine can then query or cross-reference its own prior cognitive notes during later searches!
@@ -236,7 +238,7 @@ This section contains the verbatim configuration rules and cognitive engines loa
 The engine operates dual distinct modes based dynamically upon the input signature:
 - **Mode A: Word Deconstruction (Input = A Word)**
   1. **The Raw Root:** Extract the biliteral or triliteral root and designate its naked physical / desert dynamic mechanics (e.g. cutting, pressing, flowing, insulating).
-  2. **Cross-Language Match:** Track structural or phonetic phonetic equivalents in other languages (Semitic, Indo-European).
+  2. **Cross-Language Match:** Track structural or phonetic phonetic equivalents in other languages (Semitic, Indo-European, Latin, English), demonstrating the unified phonetic root across these language families.
   3. **The Anti-Spin Translation:** Strip away dogmatic, historical, social, or emotional euphemisms to state what the term means functionally.
   4. **The Logos Analogy:** Apply the Cybernetic, Biological, or Physics analogy to explain how this concept operates in a system.
 - **Mode B: Root Generation (Input = A Root, e.g. ح-س-ب)**
