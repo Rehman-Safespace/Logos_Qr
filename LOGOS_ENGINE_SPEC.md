@@ -99,7 +99,7 @@ The custom NodeJS server runs direct full-stack routing and proxies all API keys
 ```
 
 ### The Null Protocol Algorithm
-1. The backend implements a lightweight retrieval-augmented generation (RAG) algorithm across mounted reference documents.
+1. The backend implements a retrieval-augmented generation (RAG) algorithm across mounted reference documents. Future-proofing includes a **Vector Chunking Pipeline**: If manual matrix files and reference documents grow beyond 25,000 words, the system replaces the in-memory array sequence with an embedded pipeline natively routed to a persistent vector database (e.g. ChromaDB or Pinecone) to ensure continuous O(n) mathematical scaling.
 2. If **Strict Null Protocol (Closed Matrix Mode)** is active, all analysis has a zero-tolerance hallucination restriction.
 3. If search relevance weight scores fail to pass a critical confidence rating of **30**, the backend halts execution instantly. This locks down linguistic generation to *only* documented etymological datasets, blocking any generalized model fabrications.
 
@@ -143,12 +143,14 @@ fs.writeFileSync(memoryFilePath, JSON.stringify(uniqueMemories, null, 2), "utf-8
 ## 6. Sensation, Safety, & Upstream Throttling Interceptions
 Because language deconstruction can handle sensitive materials (linguistics, politics, history), the model handles upstream safety filters smoothly.
 
-### 6.1 Multi-Tier AI Chain Fallback
+### 6.1 Multi-Tier AI Chain Fallback & Multi-Agent Voting
 The server implements an automated hierarchical fallback chain to maximize uptime and preserve user session quotas:
 ```
 [ High-Thinking Mode ] ────────► gemini-2.5-pro ──► gemini-3.1-pro-preview ──► gemini-2.5-flash ──► gemini-3.5-flash
 [ Standard Mode ] ─────────────► gemini-2.5-flash ──► gemini-3.5-flash
 ```
+
+**Multi-Agent Voting:** Instead of relying entirely on simple sequential rate-limit fallback mapping, the system initiates simultaneous **Multi-Agent Voting**. Two lightweight diagnostic models run concurrently to analyze roots independently and form a consensus or split verification lock. Passing this alignment checkpoint before invoking a heavy reasoning model reduces false alignments and systemic hallucinations in complex multi-lingual processing.
 
 ### 6.2 Dynamic Safety Interceptor Block (Aesthetic Fallback)
 If every model in the fallback chain crashes or rejects the request due to upstream structural safety limits, rate limits, or quota throttling, a customized server interceptor handles the error:

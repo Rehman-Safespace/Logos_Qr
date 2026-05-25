@@ -16,12 +16,16 @@ import {
   ExternalLink
 } from "lucide-react";
 import { DeconstructionNode } from "../types";
+import { auth, db, handleFirestoreError, OperationType } from "../lib/firebase";
+import { signInAnonymously } from "firebase/auth";
+import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firestore";
 
 interface MemoryNode {
   key: string;
   root: string;
   insight: string;
   timestamp: string;
+  ownerId?: string;
 }
 
 interface LogosLongTermMemoryProps {
@@ -69,39 +73,42 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
     setMemories(initialMems);
     localStorage.setItem("logos_longterm_memory", JSON.stringify(initialMems));
 
-    // Confirm server-side disk file presentation
     const verifyDatabaseDiskState = async () => {
       try {
-        const resp = await fetch("/api/memory-sync");
-        const data = await resp.json();
-        if (data.filePresent) {
-          setIsLocalFilePresent(true);
-          // Sync server memories to frontend state if server has more items or represents master copies
-          if (Array.isArray(data.memories) && data.memories.length > 0) {
-            // Merge logic to prevent duplicates
-            const merged = [...initialMems];
-            let addedCount = 0;
-            data.memories.forEach((serverMem: any) => {
-              const matchExists = merged.find(m => m.root.trim() === serverMem.root.trim());
-              if (!matchExists) {
-                merged.push(serverMem);
-                addedCount++;
-              }
-            });
-            if (addedCount > 0) {
-              setMemories(merged);
-              localStorage.setItem("logos_longterm_memory", JSON.stringify(merged));
-              // Propagate back to system directives
-              const dynamicDirectives = merged.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
-              onInjectMemoryDirectives(dynamicDirectives);
-            }
-          }
-        } else {
-          setIsLocalFilePresent(false);
+        if (!auth.currentUser) {
+           await signInAnonymously(auth);
         }
-      } catch (err) {
-        console.error("Could not complete database disk verification boot-check:", err);
+      } catch (e) {
+         console.warn("Failed anonymous auth for memory sync", e);
       }
+      
+      auth.onAuthStateChanged((user) => {
+         if (user) {
+            const memRef = collection(db, "memories");
+            const q = query(memRef, where("ownerId", "==", user.uid));
+            onSnapshot(q, (snapshot) => {
+               const latest: MemoryNode[] = [];
+               snapshot.forEach(doc => latest.push({ key: doc.id, ...doc.data() } as MemoryNode));
+               
+               setIsLocalFilePresent(true); // indicates connected
+               
+               if (latest.length > 0) {
+                 // Merge with local defaults
+                 const merged = [...initialMems];
+                 latest.forEach(serverMem => {
+                   if (!merged.find(m => m.root.trim() === serverMem.root.trim())) {
+                     merged.push(serverMem);
+                   }
+                 });
+                 setMemories(merged);
+                 localStorage.setItem("logos_longterm_memory", JSON.stringify(merged));
+                 
+                 const dynamicDirectives = merged.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
+                 onInjectMemoryDirectives(dynamicDirectives);
+               }
+            });
+         }
+      });
     };
 
     verifyDatabaseDiskState();
@@ -124,82 +131,76 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
     return () => clearInterval(checkTokenInterval);
   }, [gdriveToken]);
 
-  // Save memories to localStorage, sync to disk, and inject them as system guidelines
-  const saveAndApplyMemories = async (updatedMemories: MemoryNode[]) => {
-    setMemories(updatedMemories);
-    localStorage.setItem("logos_longterm_memory", JSON.stringify(updatedMemories));
-    
-    // Inject memory rules dynamically back to prompt context stream (Rule 3 Context Injection)
-    const dynamicDirectives = updatedMemories.map(
-      m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`
-    );
-    onInjectMemoryDirectives(dynamicDirectives);
-
-    // Write to physical logos_cognitive_memory.json database file on backend disk (Rule 2 Dual Sync)
-    try {
-      const resp = await fetch("/api/memory-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memories: updatedMemories })
-      });
-      const data = await resp.json();
-      if (data.success) {
-        setIsLocalFilePresent(true);
-      }
-    } catch (e) {
-      console.error("Failed to execute dual storage sync to disk database:", e);
-    }
-  };
-
-  const handleManualAdd = (e: React.FormEvent) => {
+  const handleManualAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoot.trim() || !newInsight.trim()) return;
 
+    if (!auth.currentUser) {
+      setStatusMsg({ type: "error", text: "Firebase Authentication required to compile." });
+      return;
+    }
+
+    const key = "mem-" + Date.now();
     const nNode: MemoryNode = {
-      key: "mem-" + Date.now(),
+      key,
       root: newRoot.trim(),
       insight: newInsight.trim(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      ownerId: auth.currentUser.uid
     };
-
-    const next = [nNode, ...memories];
-    saveAndApplyMemories(next);
-    setNewRoot("");
-    setNewInsight("");
-    setStatusMsg({ type: "success", text: `Memory token for '${nNode.root}' merged into cognitive memory bank.` });
+    
+    try {
+      await setDoc(doc(db, "memories", key), nNode);
+      setNewRoot("");
+      setNewInsight("");
+      setStatusMsg({ type: "success", text: `Memory token for '${nNode.root}' merged into cognitive memory bank.` });
+    } catch(err) {
+      setStatusMsg({ type: "error", text: "Failed to persist to Firestore." });
+      handleFirestoreError(err, OperationType.CREATE, `memories/${key}`);
+    }
   };
 
-  const handleDelete = (key: string) => {
-    const next = memories.filter(m => m.key !== key);
-    saveAndApplyMemories(next);
+  const handleDelete = async (key: string) => {
+    try {
+       await deleteDoc(doc(db, "memories", key));
+    } catch(err) {
+       setStatusMsg({ type: "error", text: "Failed to delete target." });
+       handleFirestoreError(err, OperationType.DELETE, `memories/${key}`);
+    }
   };
 
   // Compile active search history into persistent long-term memory
-  const handleAutoAssimilateHistory = () => {
+  const handleAutoAssimilateHistory = async () => {
     if (activeDeconstructionNodes.length === 0) {
       setStatusMsg({ type: "error", text: "Search chronological query history is empty. Deconstruct roots first." });
       return;
     }
+    
+    if (!auth.currentUser) return;
 
     let joinedCount = 0;
-    const nextMemories = [...memories];
 
-    activeDeconstructionNodes.forEach(node => {
-      // Check if root already logged in memory
-      const exists = nextMemories.find(m => m.root === node.root);
+    for (const node of activeDeconstructionNodes) {
+      const exists = memories.find(m => m.root === node.root);
       if (!exists && node.learningLog) {
-        nextMemories.push({
-          key: "mem-auto-" + Date.now() + Math.random().toString(36).substring(2, 5),
+        const key = "mem-auto-" + Date.now() + Math.random().toString(36).substring(2, 5);
+        const mem: MemoryNode = {
+          key,
           root: node.root,
           insight: `${node.desertMeaning} - ${node.learningLog.whatLearnt}`,
-          timestamp: new Date().toISOString()
-        });
-        joinedCount++;
+          timestamp: new Date().toISOString(),
+          ownerId: auth.currentUser.uid
+        };
+        try {
+           await setDoc(doc(db, "memories", key), mem);
+           joinedCount++;
+        } catch(e) {
+           console.error("Auto assimilation sync failed", e);
+        }
       }
-    });
+    }
 
     if (joinedCount > 0) {
-      saveAndApplyMemories(nextMemories);
       setStatusMsg({ type: "success", text: `${joinedCount} new cognitive insights compiled and permanently locked in memory.` });
     } else {
       setStatusMsg({ type: "success", text: "All analyzed structures are already fully synchronized inside memory ledger." });

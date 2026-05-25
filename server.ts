@@ -13,7 +13,7 @@ const PORT = 3000;
 app.use(express.json({ limit: "20mb" }));
 
 // Administrative Authorization Password limit
-let masterPasscode = "logos_secure";
+let masterPasscode = "LOGOS-9";
 // In-Memory state of Directives (can be edited dynamically in live sessions)
 let currentDirectives = {
   arabicDefinition: "The functional physical property meaning 'Structural Transparency, High-Resolution Distinction, and Absolute Alignment with Material Reality'. Whenever a concept is 'Arabized', we strip away dogmatic or historical layers and align it strictly with physical, material, or thermodynamic truth.",
@@ -85,6 +85,18 @@ let referenceFiles: Array<{ id: string; name: string; content: string; source: s
       - س-ن-د: The primary buffer (سندس) forms the micro-interface that stabilizes the CPU from signaling noise.
       - ب-ر-ق: Highly volatile signal bursts (البرق) trigger an insulated shield path protection (إستبرق) to maintain memory integrity.
     `
+  },
+  {
+    id: "source-engine",
+    name: "Logos Core Engine Instructions",
+    source: "Linguistic Engineering Corp",
+    content: `
+      ## Core Engine Architecture
+      
+      - **Vector Chunking Pipeline**: If manual matrix files and reference documents grow beyond standard contextual scale (e.g., 25,000 words), replace the in-memory array sequential checks with an embedded pipeline natively routed to a persistent vector database (like ChromaDB or Pinecone) to ensure O(n) mathematical scaling and structural efficiency.
+      
+      - **Multi-Agent Voting**: Instead of a strict sequential fallback across rate limit exhaustion, the system will utilize a simultaneous multi-agent voting protocol. Two lightweight diagnostic models (e.g., flash models) will concurrently evaluate root-extractions. The consensus or weighted split prevents false alignments, increasing structural reliability before passing to a heavy reasoning model for finalize multi-lingual analysis.
+    `
   }
 ];
 
@@ -106,7 +118,7 @@ function loadReferenceFilesFromDisk() {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
         const filtered = parsed.filter(f => f.id !== "doc-memory-sync" && f.name !== "logos_cognitive_memory.json");
-        const defaults = referenceFiles.filter(df => df.id === "source-thermo" || df.id === "source-cyber");
+        const defaults = referenceFiles.filter(df => df.id === "source-thermo" || df.id === "source-cyber" || df.id === "source-engine");
         const mergedList = [...defaults];
         filtered.forEach(item => {
           if (!mergedList.some(d => d.id === item.id || d.name === item.name)) {
@@ -498,6 +510,13 @@ interface RAGMatchItem {
   score: number;
 }
 
+interface RAGMatchItem {
+  verbatimVerse: string;
+  sourceFile: string;
+  lineNumber: number;
+  score: number;
+}
+
 interface RAGQueryResult {
   found: boolean;
   verbatimVerse: string;
@@ -508,7 +527,39 @@ interface RAGQueryResult {
   allMatches?: RAGMatchItem[];
 }
 
-function runRAGEngine(inputQuery: string): RAGQueryResult {
+// Global In-Memory Vector Database caching (Simulating Pinecone / pgvector)
+const globalVectorDB: Map<string, number[]> = new Map();
+
+function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+async function getEmbeddingSafe(text: string): Promise<number[] | null> {
+  if (globalVectorDB.has(text)) return globalVectorDB.get(text)!;
+  try {
+    const result = await ai.models.embedContent({
+      model: 'gemini-embedding-2',
+      contents: text
+    });
+    const vec = result.embeddings[0].values;
+    globalVectorDB.set(text, vec);
+    return vec;
+  } catch (err) {
+    // Graceful degrade if rate limit is hit
+    return null;
+  }
+}
+
+async function runRAGEngine(inputQuery: string): Promise<RAGQueryResult> {
   if (!inputQuery) {
     return {
       found: false,
@@ -525,79 +576,73 @@ function runRAGEngine(inputQuery: string): RAGQueryResult {
   let totalChars = 0;
   let scannedCount = 0;
 
-  // Split query into terms to handle full paragraphs or multi-word inputs
   const rawTerms = inputQuery.split(/[\s,.\-()\[\]{}#|/\\;:]+/);
   const terms = rawTerms
     .map(t => t.trim().toLowerCase())
     .filter(t => t.length > 1);
-
   const uniqueTerms = Array.from(new Set(terms));
 
-  // Extract Arabic root letters if any (e.g. ح-س-ب or separate letters)
   const rootMatches = inputQuery.match(/[\u0600-\u06FF]\s*-\s*[\u0600-\u06FF]\s*-\s*[\u0600-\u06FF]/g);
   let cleanRoots: string[] = [];
   if (rootMatches) {
     cleanRoots = rootMatches.map(r => r.replace(/\s+/g, "").toLowerCase());
   }
 
-  interface RAGScore {
-    verbatimVerse: string;
-    sourceFile: string;
-    lineNumber: number;
-    score: number;
-  }
-
-  const allScores: RAGScore[] = [];
+  const allScores: RAGMatchItem[] = [];
+  
+  // Vector search attempt
+  const queryVec = await getEmbeddingSafe(cleanInputLower);
 
   for (const doc of referenceFiles) {
     scannedCount++;
     totalChars += doc.content.length;
     const lines = doc.content.split("\n");
 
-    lines.forEach((line, index) => {
+    for (let index = 0; index < lines.length; index++) {
+      const line = lines[index];
       const trimmedLine = line.trim();
-      if (!trimmedLine) return;
+      if (!trimmedLine) continue;
 
       const lineNumber = index + 1;
       const lowerLine = trimmedLine.toLowerCase();
       let score = 0;
-      let matchedTermsCount = 0;
 
-      // 1. Check exact raw substring match (very high priority)
+      // Primary Semantic Vector Alignment Scoring
+      if (queryVec) {
+         const lineVec = await getEmbeddingSafe(trimmedLine);
+         if (lineVec) {
+           const sim = cosineSimilarity(queryVec, lineVec);
+           if (sim > 0.6) {
+             // 60%+ similarity triggers baseline vector match
+             score += Math.round(sim * 200); 
+           }
+         }
+      }
+
+      // Exact-Match Fallback Math Scoring
       if (cleanInputLower.length > 2 && lowerLine.includes(cleanInputLower)) {
         score += 150;
       }
-
-      // 2. Check spacing/dash sanitized match (for root matches or consolidated words)
       const cleanInputSpaceless = cleanInputLower.replace(/[ -]/g, "");
       const cleanLineSpaceless = lowerLine.replace(/[ -]/g, "");
       if (cleanInputSpaceless.length > 2 && cleanLineSpaceless.includes(cleanInputSpaceless)) {
         score += 120;
       }
-
-      // 3. Word-level overlapping scores
       uniqueTerms.forEach(term => {
         if (lowerLine.includes(term)) {
-          matchedTermsCount++;
           const wordRegex = new RegExp(`\\b${term}\\b`, "i");
-          // Match standard words or root notations with trailing dashes
-          const isWordBound = wordRegex.test(trimmedLine) || trimmedLine.includes(`-${term}-`) || trimmedLine.includes(`${term}:`);
-          if (isWordBound) {
+          if (wordRegex.test(trimmedLine) || trimmedLine.includes(`-${term}-`) || trimmedLine.includes(`${term}:`)) {
             score += 45;
           } else {
             score += 20;
           }
         }
       });
-
-      // 4. Exact Root notation matches (e.g., ح-س-ب)
       cleanRoots.forEach(root => {
         if (lowerLine.includes(root)) {
           score += 100;
         }
       });
-
-      // 5. Short string characters search density fallback (retains accuracy for roots/short word targets)
       if (cleanInputSpaceless.length > 0 && cleanInputSpaceless.length <= 6) {
         const letters = cleanInputSpaceless.split("");
         let lettersMatched = 0;
@@ -620,10 +665,9 @@ function runRAGEngine(inputQuery: string): RAGQueryResult {
           score
         });
       }
-    });
+    }
   }
 
-  // Sort globally by score descending
   allScores.sort((a, b) => b.score - a.score);
 
   if (allScores.length > 0) {
@@ -701,14 +745,14 @@ app.post("/api/deconstruct", async (req, res) => {
   let selectedModel = "";
   let fallbackErrors: string[] = [];
   try {
-    const { mode, strictNullProtocol, useHighThinkingModel, memoryDirectives, forceEnglish } = req.body;
+    const { mode, strictNullProtocol, useHighThinkingModel, memoryDirectives, forceEnglish, isFirstQuery } = req.body;
     input = req.body.input;
     if (!input) {
       return res.status(400).json({ error: "Input word or root is required." });
     }
 
     // Execute multi-source RAG indexing engine query
-    const ragResult = runRAGEngine(input);
+    const ragResult = await runRAGEngine(input);
 
     // If strict NULL protocol is active and no anchoring references exist in RAG database:
     if (strictNullProtocol && !ragResult.found) {
@@ -772,6 +816,31 @@ app.post("/api/deconstruct", async (req, res) => {
         .join("\n\n");
     }
 
+    // --- MULTI-AGENT VOTING PROTOCOL: Root Extraction Consensus ---
+    let rootConsensusStr = "";
+    if (useHighThinkingModel && !strictNullProtocol) {
+      try {
+        console.log("Initiating simultaneous Multi-Agent Voting protocol for root extraction...");
+        const votePrompt = `Analyze the query: "${input}". Provide exclusively the primary 3-letter or 4-letter Semitic/Arabic root isolated (e.g. ح-س-ب). Output nothing else.`;
+        const vote1 = ai.models.generateContent({ model: "gemini-3.5-flash", contents: votePrompt });
+        const vote2 = ai.models.generateContent({ model: "gemini-2.5-flash", contents: votePrompt });
+        
+        const [res1, res2] = await Promise.all([vote1, vote2]);
+        const v1 = res1.text?.trim() || "";
+        const v2 = res2.text?.trim() || "";
+        
+        if (v1 && v1 === v2) {
+          rootConsensusStr = `MULTI-AGENT FLASH CONSENSUS (gemini-3.5-flash & gemini-2.5-flash): Both diagnostic agents independently aligned and verified the primary extracted root is [${v1}]. Use this as absolute baseline reality.`;
+          activeModelsEngaged.push("gemini-3.5-flash-diagnostic-A", "gemini-2.5-flash-diagnostic-B");
+        } else {
+           rootConsensusStr = `MULTI-AGENT SPLIT: Diagnostic Agent A suggests [${v1}], Agent B suggests [${v2}]. The main reasoning engine must independently verify and decide the true root vector to prevent false alignment.`;
+           activeModelsEngaged.push("gemini-3.5-flash-diagnostic-A", "gemini-2.5-flash-diagnostic-B");
+        }
+      } catch (e) {
+        console.log("Multi-level root voting skipped due to API strain");
+      }
+    }
+
     // Inject custom directive parameters from Admin Panel
     const systemPromptMessage = `
 ${currentDirectives.customPromptBase}
@@ -790,7 +859,8 @@ OPERATIONAL LINGUISTIC SCHEMA:
 
 THE SPECIFIC ANALYSIS MODE INSTRUCTIONS:
 Mode A (Input = Word):
-  1. Naked Root Extractor: Extract its naked, literal physical physical/desert mechanic (cutting, moving, hot, cold). Refer strictly back to any source matches.
+  1. Naked Root Extractor: Extract its naked, literal physical physical/desert mechanic (cutting, moving, hot, cold). Refer strictly back to any source matches. 
+  ${rootConsensusStr ? `[ROOT HINT - ` + rootConsensusStr + `]` : ''}
   2. Cross-Linguistic Phonetic Map: Find phonetic or structural matches in Hebrew, English, or other families.
   3. Euphemism Stripper: Eliminate administrative, dogmatic, or religious spin. Reveal its mechanics purely in active voice.
   4. Analogy Engine: Translate this concept using:
@@ -815,6 +885,15 @@ You must respond strictly with a valid JSON format representing this analysis.
     const promptString = `
 INPUT VALUE: "${input}"
 MODE_TYPE: "${mode === "B" ? "B (Root Generation)" : "A (Word Deconstruction)"}"
+${isFirstQuery ? `
+NEW SESSION TRIGGERED:
+Your first output MUST include new updates of your learning process reflecting:
+- What you learnt from the attached source files.
+- Why it's new.
+- What is the next segment planned for learning.
+- Have the new updates integrated with your self-learning database?
+- Any suggestions or restrictions based on segment learning limits.
+Ensure these details are included in the JSON response under the "learningLog" field.` : ""}
 
 SOURCED REFERENCE DATABASE ARCHIVE (THE ULTIMATE CORE REFERENCE):
 ${matchedDatabaseReferenceStr}
@@ -854,12 +933,14 @@ Generate the deconstruction details according to the prompt schema. Ensure your 
     "whatLearnt": "A brief technical summary inside ${languageLabel} summarizing what physical linguistic mechanism was discovered/asymmetrically mapped during this search, citing source files/line numbers.",
     "whyNew": "A concise description in ${languageLabel} clarifying why this deconstruction changes our systemic etymological context and removes social dogma",
     "nextPlannedSegment": "Next recommended root or scientific mapping segment in ${languageLabel}",
+    "integrated": "Boolean or text confirming whether the new updates are integrated into the self learning database",
+    "suggestionsOrRestrictions": "Any suggestions or restrictions based on limits",
     "memoryUnifiedKey": "Generate a unique 8-character hex-like cognitive signature for this memory record, e.g. '0x5F3E9B'"
   }
 }
 `;
 
-    let response;
+    let resultStream: any = null;
     let modelSuccess = false;
     fallbackErrors = [];
 
@@ -870,7 +951,7 @@ Generate the deconstruction details according to the prompt schema. Ensure your 
         selectedModel = modelCandidate;
         activeModelsEngaged[0] = modelCandidate;
 
-        response = await ai.models.generateContent({
+        resultStream = await ai.models.generateContentStream({
           model: modelCandidate,
           contents: promptString,
           config: {
@@ -879,6 +960,7 @@ Generate the deconstruction details according to the prompt schema. Ensure your 
           }
         });
 
+        // Test stream initiation
         modelSuccess = true;
         break; // Successfully completed deconstruction!
       } catch (err: any) {
@@ -903,39 +985,52 @@ Generate the deconstruction details according to the prompt schema. Ensure your 
       }
     }
 
-    if (!modelSuccess || !response) {
+    if (!modelSuccess || !resultStream) {
       throw new Error(`All available model candidates in deconstruction chain failed. Telemetries: ${fallbackErrors.join(" | ")}`);
     }
 
-    const bodyText = response.text || "{}";
-    let parsedData;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    let fullBodyText = "";
     try {
-      parsedData = JSON.parse(bodyText);
-    } catch (parseErr) {
-      // If the model output markdown blocks, clean them up and try parsing
-      const cleaned = bodyText.replace(/```json/gi, "").replace(/```/g, "").trim();
-      parsedData = JSON.parse(cleaned);
+      for await (const chunk of resultStream) {
+        if (chunk.text) {
+          fullBodyText += chunk.text;
+          res.write(`data: ${JSON.stringify({ chunk: chunk.text })}\n\n`);
+        }
+      }
+    } catch (e: any) {
+      res.write(`data: ${JSON.stringify({ error: e.message || "Stream interrupted" })}\n\n`);
     }
 
-    // Attach Matrix Anchoring result if we found one
+    let parsedData: any = {};
+    try {
+      parsedData = JSON.parse(fullBodyText);
+    } catch (parseErr) {
+      const cleaned = fullBodyText.replace(/```json/gi, "").replace(/```/g, "").trim();
+      try {
+         parsedData = JSON.parse(cleaned);
+      } catch (e) {}
+    }
+
+    const metadataEvent: any = {};
     if (ragResult.found) {
-      parsedData.matrixAnchoring = {
+      metadataEvent.matrixAnchoring = {
         found: true,
         verbatimVerse: ragResult.verbatimVerse,
         sourceFile: ragResult.sourceFile,
         relevanceScore: ragResult.relevanceScore
       };
     } else {
-      parsedData.matrixAnchoring = {
-        found: false
-      };
+      metadataEvent.matrixAnchoring = { found: false };
     }
 
-    // Calculate metadata telemetry
     const durationMs = Date.now() - startTime;
     const dateStr = new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
 
-    parsedData.engineMetadata = {
+    metadataEvent.engineMetadata = {
       timeTakenMs: durationMs,
       timestampUtc: dateStr,
       modelsUsed: activeModelsEngaged,
@@ -943,22 +1038,16 @@ Generate the deconstruction details according to the prompt schema. Ensure your 
       cognitiveStepsCount: useHighThinkingModel ? 14 : 7
     };
 
-    // If the model failed to generate learningLog contents, pre-build them for stability
-    if (!parsedData.learningLog) {
-      parsedData.learningLog = {
-        whatLearnt: `تم تفكيك البنية الفيزيائية والاتجاهات الحركية للجذر وتصفيته من التأويلات الإضافية.`,
-        whyNew: `تم استبدال النظريات اللغوية التقليدية بمنظومة تحكم مادية وقوانين فيزيائية واضحة.`,
-        nextPlannedSegment: `دراسة الاستقرار الحراري للخلايا القادمة.`,
-        memoryUnifiedKey: "0xBC" + Math.floor(Math.random() * 9000 + 1000).toString(16)
-      };
-    }
-
-    res.json({
-      deconstruction: parsedData
-    });
+    res.write(`data: ${JSON.stringify({ metadata: metadataEvent })}\n\n`);
+    res.write(`data: [DONE]\n\n`);
+    res.end();
 
   } catch (err: any) {
     console.error("Deconstruction route error: ", err);
+    if (res.headersSent) {
+       res.end();
+       return;
+    }
     const errorMsg = (err?.message || "").toLowerCase();
     
     // Explicit condition if upstream safety filters or rate limits are hit

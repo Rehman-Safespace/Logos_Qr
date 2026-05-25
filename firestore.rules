@@ -51,5 +51,13 @@ service cloud.firestore {
       allow delete: if isSignedIn() 
         && isOwner(resource.data.ownerId);
     }
+
+    match /keep_notes/{noteId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /directives/{id} {
+      allow read, write: if isSignedIn();
+    }
   }
 }

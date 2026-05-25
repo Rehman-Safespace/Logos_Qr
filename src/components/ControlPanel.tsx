@@ -23,7 +23,7 @@ export default function ControlPanel({ onDirectivesSaved }: ControlPanelProps) {
       
       // Auto-unlock if user email matches developer or admin access (e.g. safespace.ch@gmail.com)
       if (user && user.email === "safespace.ch@gmail.com") {
-        setPasscode("logos_secure"); // Set fallback payload passcode for server compatibility
+        setPasscode("LOGOS-9"); // Set fallback payload passcode for server compatibility
         setIsAuthenticated(true);
         setFeedback({ 
           type: "success", 
@@ -73,7 +73,7 @@ export default function ControlPanel({ onDirectivesSaved }: ControlPanelProps) {
   // Handle Passcode Unlock Challenge
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode.trim() === "logos_secure") {
+    if (passcode.trim() === "LOGOS-9") {
       setIsAuthenticated(true);
       setFeedback({ type: "success", message: "System Security Clearance level 0o2 Granted." });
       setTimeout(() => setFeedback(null), 3000);
@@ -171,7 +171,7 @@ export default function ControlPanel({ onDirectivesSaved }: ControlPanelProps) {
       {!isAuthenticated ? (
         <form onSubmit={handleUnlock} className="flex flex-col gap-3.5 max-w-xl">
           <p className="text-slate-400 text-xs leading-relaxed">
-            To edit, overwrite, or add operational logic elements inside this container, authenticate with the system master passcode (Default: <strong className="text-amber-500">logos_secure</strong>), or instantly verify using your Google Workspace Admin account:
+            To edit, overwrite, or add operational logic elements inside this container, authenticate with the system master passcode (Default: <strong className="text-amber-500">LOGOS-9</strong>), or instantly verify using your Google Workspace Admin account:
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 flex gap-2">

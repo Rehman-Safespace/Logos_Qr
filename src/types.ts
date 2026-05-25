@@ -78,6 +78,7 @@ export interface Message {
   timestamp: string;
   deconstruction?: DeconstructionNode;
   isThrottledWarning?: boolean;
+  rawStream?: string;
 }
 
 export interface LearningState {

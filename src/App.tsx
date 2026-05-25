@@ -135,6 +135,7 @@ export default function App() {
   const [matchDetails, setMatchDetails] = useState<{ docName: string; text: string } | null>(null);
 
   // Browser Voice Typing Speech Recognition System
+  const [speechLanguage, setSpeechLanguage] = useState<"ar-SA" | "en-US">("ar-SA");
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
 
@@ -157,8 +158,7 @@ export default function App() {
     recognitionRef.current = rec;
     rec.continuous = false;
     rec.interimResults = false;
-    // Set language: Arabic for Word Deconstruction, English/Latin for Root Generation
-    rec.lang = currentMode === Mode.WORD_DECONSTRUCTION ? "ar-SA" : "en-US";
+    rec.lang = speechLanguage;
 
     rec.onstart = () => {
       setIsListening(true);
@@ -453,50 +453,105 @@ Learning records are compiled and dynamically locked inside the current server i
           strictNullProtocol,
           useHighThinkingModel,
           memoryDirectives,
-          forceEnglish
+          forceEnglish,
+          isFirstQuery: messages.length === 0 // Check if this is the first interaction in the session
         })
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.error || "System error inside deconstruction pipe.");
+        let errStr = "System error inside deconstruction pipe.";
+        try {
+          const result = await response.json();
+          errStr = result.error || errStr;
+        } catch(e) {}
+        throw new Error(errStr);
       }
 
-      if (result.isClosedMatrixFailure || result.error) {
-        // Enforce exact closed-matrix output error verbatim: Error0004
-        const errorMsg: Message = {
-          id: "err-" + Date.now(),
-          role: "assistant",
-          content: result.rawText || "Error0004: Data not found in the source matrix.",
-          timestamp: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, errorMsg]);
-        setActivityLevel("completed");
-        if (autoVocalize) {
-          handleSynthesizeText(errorMsg.content, errorMsg.id);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Streaming not supported.");
+      const decoder = new TextDecoder("utf-8");
+
+      const tempAiId = "ai-" + Date.now();
+      let streamBuffer = "";
+      let engineMetadataCache: any = null;
+      let matrixAnchoringCache: any = null;
+      
+      const aiMsg: Message = {
+        id: tempAiId,
+        role: "assistant",
+        content: `Analyzing coordinate ${term}...`,
+        timestamp: new Date().toISOString(),
+        rawStream: ""
+      };
+      setMessages(prev => [...prev, aiMsg]);
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunkStr = decoder.decode(value, { stream: true });
+        const lines = chunkStr.split("\n\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+             const dataStr = line.substring(6);
+             if (dataStr === "[DONE]") break;
+             try {
+                const data = JSON.parse(dataStr);
+                if (data.error || data.isClosedMatrixFailure) {
+                    throw new Error(data.error || data.rawText || "Error0004: Data not found in the source matrix.");
+                }
+                if (data.chunk) {
+                   streamBuffer += data.chunk;
+                   setMessages(prev => prev.map(m => m.id === tempAiId ? { ...m, rawStream: streamBuffer } : m));
+                }
+                if (data.metadata) {
+                   engineMetadataCache = data.metadata.engineMetadata;
+                   matrixAnchoringCache = data.metadata.matrixAnchoring;
+                }
+             } catch(e) {
+                if (e instanceof Error && e.message.includes("Error0004")) throw e;
+             }
+          }
         }
-        return;
+      }
+
+      // Finalize JSON Parse
+      let finalData;
+      try {
+         let cleanJson = streamBuffer.trim();
+         if (cleanJson.startsWith("```json")) cleanJson = cleanJson.substring(7);
+         if (cleanJson.startsWith("```")) cleanJson = cleanJson.substring(3);
+         if (cleanJson.endsWith("```")) cleanJson = cleanJson.slice(0, -3);
+         cleanJson = cleanJson.trim();
+         finalData = JSON.parse(cleanJson);
+      } catch (parseErr) {
+         console.error("JSON parse error:", parseErr, streamBuffer);
+         setMessages(prev => prev.map(m => m.id === tempAiId ? {
+           ...m,
+           content: "Terminal Error: Data stream interrupted or format corrupted. See raw output.",
+           rawStream: streamBuffer
+         } : m));
+         setActivityLevel("idle");
+         setIsLoading(false);
+         return;
       }
 
       // Successful analysis returned
       const node: DeconstructionNode = {
-        ...result.deconstruction,
+        ...finalData,
         id: "analysis-" + Date.now(),
         timestamp: new Date().toISOString(),
         input: term,
-        mode: currentMode
+        mode: currentMode,
+        engineMetadata: engineMetadataCache,
+        matrixAnchoring: matrixAnchoringCache
       };
 
-      const aiMsg: Message = {
-        id: "ai-" + Date.now(),
-        role: "assistant",
+      setMessages(prev => prev.map(m => m.id === tempAiId ? {
+        ...m,
         content: `Analysis of coordinate ${term} compiled.`,
-        timestamp: new Date().toISOString(),
+        rawStream: undefined,
         deconstruction: node
-      };
-
-      setMessages(prev => [...prev, aiMsg]);
+      } : m));
       setActivityLevel("completed");
 
       if (autoVocalize) {
@@ -1069,11 +1124,17 @@ Learning records are compiled and dynamically locked inside the current server i
                             <span>{msg.timestamp.substring(11, 19)}</span>
                           </div>
 
-                          {/* Display raw textual content */}
-                          {msg.content && !msg.deconstruction && (
-                            <p className="dir-ltr text-left font-sans text-sm pr-2">
-                              {msg.content}
-                            </p>
+                          {/* Display raw textual content or streaming raw JSON */}
+                          {!msg.deconstruction && (
+                            <div className="dir-ltr text-left font-sans text-sm pr-2">
+                              {msg.content && <p className="mb-2 whitespace-pre-wrap text-slate-300">{msg.content}</p>}
+                              {msg.rawStream && (
+                                <div className="mt-2 text-[10px] sm:text-xs font-mono text-emerald-500 whitespace-pre-wrap opacity-80 border-t border-emerald-900/30 pt-2 break-all leading-relaxed">
+                                  {msg.rawStream}
+                                  <span className="w-1.5 h-3 ml-0.5 inline-block bg-emerald-500 animate-pulse align-middle" />
+                                </div>
+                              )}
+                            </div>
                           )}
                         </>
                       )}
@@ -1809,16 +1870,29 @@ Learning records are compiled and dynamically locked inside the current server i
                 }
                 className="flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-lg px-4 py-3 text-sm font-sans placeholder-slate-600 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
               />
+              {/* Voice recognition language toggle */}
+              <button
+                type="button"
+                onClick={() => setSpeechLanguage(prev => prev === "ar-SA" ? "en-US" : "ar-SA")}
+                disabled={isLoading}
+                className={`flex items-center justify-center shrink-0 w-[45px] h-[48px] rounded-lg border transition-all text-xs font-mono font-bold ${
+                  speechLanguage === "ar-SA" ? "bg-emerald-950/20 text-emerald-400 border-emerald-900/50" : "bg-indigo-950/20 text-indigo-400 border-indigo-900/50"
+                } disabled:opacity-50`}
+                title="Toggle Voice Input Language"
+              >
+                {speechLanguage === "ar-SA" ? "AR" : "EN"}
+              </button>
+
               <button
                 type="button"
                 onClick={startListening}
                 disabled={isLoading}
-                className={`p-3 rounded-lg border transition-all flex items-center justify-center shrink-0 ${
+                className={`w-[48px] h-[48px] rounded-lg border transition-all flex items-center justify-center shrink-0 ${
                   isListening
                     ? "bg-red-950/55 border-red-500 text-red-400 shadow-[0_0_12px_rgba(239,68,68,0.4)] animate-pulse"
                     : "bg-slate-900 border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-slate-700"
                 }`}
-                title="Voice input: speak live in Arabic (Mode A) or English (Mode B) to fill input field"
+                title={`Voice input: speak live in ${speechLanguage === "ar-SA" ? "Arabic" : "English"} to fill input field`}
               >
                 {isListening ? (
                   <MicOff className="w-5 h-5" />
