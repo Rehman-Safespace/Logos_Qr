@@ -881,7 +881,7 @@ THE SPECIFIC ANALYSIS MODE INSTRUCTIONS:
 Mode A (Input = Word):
   1. Naked Root Extractor: Extract its naked, literal physical physical/desert mechanic (cutting, moving, hot, cold). Refer strictly back to any source matches. 
   ${rootConsensusStr ? `[ROOT HINT - ` + rootConsensusStr + `]` : ''}
-  2. Cross-Linguistic Phonetic Map: Find phonetic or structural matches in Hebrew, English, or other families.
+  2. Cross-Linguistic Phonetic Map: Map the Semitic root to its equivalent roots in Hebrew, Proto-Indo-European (PIE), Latin, and modern English. Demonstrate the unified phonetic root across these language families, applying the rule that 'Arabic' means 'clear expression/bayan' rather than a distinct racial language, finding the common denominator.
   3. Euphemism Stripper: Eliminate administrative, dogmatic, or religious spin. Reveal its mechanics purely in active voice.
   4. Analogy Engine: Translate this concept using:
      - A Cybernetic/IT analogy (e.g. ${currentDirectives.cyberneticTemplate})
@@ -923,7 +923,7 @@ Generate the deconstruction details according to the prompt schema. Ensure your 
 {
   "root": "The extracted Semitic root letters",
   "desertMeaning": "The naked desert/physical mechanics description in ${languageLabel}. Explicitly cite the source file and line/verse number of any matched input here if extracted.",
-  "crossLanguageMatch": "The cross-language match or equivalent (English/Hebrew/Latin) - each language separated by a newline",
+  "crossLanguageMatch": "The cross-language match or equivalent roots in Hebrew, Proto-Indo-European (PIE), Latin, and English - each language mapping separated by a newline, demonstrating the phonetic link.",
   "antiSpinMeaning": "The blunt materialist reality explanation (No dogmas or social euphemisms) in ${languageLabel}. Explicitly cite the source file and line number here if referenced.",
   "analogies": [
     {

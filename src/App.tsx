@@ -73,17 +73,15 @@ export default function App() {
     localStorage.setItem("logos_auto_vocalize", JSON.stringify(autoVocalize));
   }, [autoVocalize]);
 
-  const [quotaRpm, setQuotaRpm] = useState<number>(30);
-  const [currentLoadCount, setCurrentLoadCount] = useState<number>(1);
+  const [speechRate, setSpeechRate] = useState<number>(() => {
+    const saved = localStorage.getItem("logos_speech_rate");
+    return saved !== null ? JSON.parse(saved) : 0.95;
+  });
 
-  // Decay load count over time to simulate a floating window usage
   useEffect(() => {
-    const t = setInterval(() => {
-      setCurrentLoadCount(prev => Math.max(0, prev - 1));
-    }, 12000);
-    return () => clearInterval(t);
-  }, []);
-  
+    localStorage.setItem("logos_speech_rate", JSON.stringify(speechRate));
+  }, [speechRate]);
+
   // High Thinking model toggle & Memory Directives dynamic injections
   const [useHighThinkingModel, setUseHighThinkingModel] = useState(true); // Default to high thinking reasoning model!
   const [forceEnglish, setForceEnglish] = useState<boolean>(() => {
@@ -95,7 +93,22 @@ export default function App() {
     localStorage.setItem("logos_force_english", JSON.stringify(forceEnglish));
   }, [forceEnglish]);
 
-  const [memoryDirectives, setMemoryDirectives] = useState<string[]>([]);
+  const [memoryDirectives, setMemoryDirectives] = useState<string[]>(() => {
+    const saved = localStorage.getItem("logos_longterm_memory");
+    if (saved) {
+      try {
+        const mems = JSON.parse(saved);
+        if (Array.isArray(mems) && mems.length > 0) {
+          return mems.map((m: any) => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
+        }
+      } catch (e) {
+        // error parsing
+      }
+    }
+    return [
+       `Physical memory anchor for root [ح-س-ب]: "The structural limit calculations (الحساب) must map fully onto physical energy-loss bounds inside active silicon or carbon networks."`,
+    ];
+  });
 
   // Relaxed mode & Collapsible views
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -644,7 +657,7 @@ Learning records are compiled and dynamically locked inside the current server i
     // Browser Web Speech fallback
     const speech = new SpeechSynthesisUtterance(cleanedText);
     speech.lang = hasArabic(cleanedText) ? "ar-SA" : "en-US";
-    speech.rate = 0.95;
+    speech.rate = speechRate;
     speech.onend = () => setIsPlayingId(null);
     window.speechSynthesis.speak(speech);
   };
@@ -1127,12 +1140,7 @@ Learning records are compiled and dynamically locked inside the current server i
                   )}
                 </div>
 
-                  <div className="flex-1 overflow-y-auto mb-4 border border-slate-900 bg-slate-950/30 rounded-lg p-2 h-[calc(100vh-220px)] flex flex-col items-stretch space-y-4 shadow-inner custom-scrollbar relative">
-                    <style dangerouslySetInnerHTML={{__html: `
-                      .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-                      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                      .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 20px; }
-                    `}} />
+                  <div className="flex-1 flex flex-col items-stretch space-y-4 pb-12">
                     {messages.map((msg) => (
                     <div
                       key={msg.id}
@@ -1409,7 +1417,7 @@ Learning records are compiled and dynamically locked inside the current server i
                           {/* 4. CrossLanguage phonetic equivalents (Rule 4 alignment bypass) */}
                           <div>
                             <span className="block text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-1">
-                              Cross-Linguistic Phonetic Map:
+                              Unified Cross-Linguistic Phonetic Root Map (PIE/Hebrew/Latin):
                             </span>
                             <div className="bg-slate-900/20 p-3 rounded border border-slate-900">
                               {/* Splitting lines so Ar and En sit on unique rows to preserve RTL direction */}
@@ -1811,6 +1819,27 @@ Learning records are compiled and dynamically locked inside the current server i
                     <p className="text-[9px] text-slate-500 leading-relaxed font-sans pl-5">
                       Vocalizes user inputs and deconstruction outputs automatically via TTS synthesis vector.
                     </p>
+                    
+                    {/* Speech Rate sub-control */}
+                    <div className="pt-2 pl-5">
+                      <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                        <span>Speech Velocity: {speechRate}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2"
+                        step="0.05"
+                        value={speechRate}
+                        onChange={(e) => setSpeechRate(Number(e.target.value))}
+                        className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 transition"
+                      />
+                      <div className="flex justify-between text-[8px] text-slate-600 mt-1">
+                        <span>0.5x</span>
+                        <span>1x</span>
+                        <span>2x</span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* RTL symmetry parser with Force English toggle */}
@@ -1871,26 +1900,6 @@ Learning records are compiled and dynamically locked inside the current server i
       <footer className="fixed bottom-0 left-0 right-0 z-40 bg-[#020617]/90 backdrop-blur-md border-t border-slate-800 py-3 px-4 shadow-[0_-15px_30px_rgba(2,6,23,0.8)]">
         <div className="max-w-4xl mx-auto">
           <form onSubmit={executeDeconstruction} className="flex flex-col gap-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#090d1f]/60 border border-slate-800/80 rounded-lg px-3 py-1.5 text-xs">
-              
-              {/* 1. Auto-Hybrid Smart Selection Tracker Badge */}
-              <div className="flex items-center gap-2" title="Unified Dynamic Smart Selection Hybrid Mode is active">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span className="text-[10px] text-slate-300 font-sans font-semibold uppercase tracking-wider">
-                  Hybrid Mode:
-                </span>
-                <span className="text-emerald-400 font-mono text-[9px] bg-emerald-950/30 border border-emerald-900/30 px-1.5 py-0.5 rounded font-bold">
-                  ⚡ INSTANT
-                </span>
-              </div>
-
-              {/* 6. English / Arabic bilingual flags badge */}
-              <div className="flex items-center gap-1 bg-[#020617] border border-slate-850 px-2 py-0.5 rounded font-mono text-[9px] text-slate-500">
-                <span>Alignment:</span>
-                <span className="text-xs">{forceEnglish ? "🇺🇸 Only" : "🇺🇸 | 🇸🇦"}</span>
-              </div>
-            </div>
-
             {/* Smart Dynamic Selection Indicator Panel */}
             {inputText.trim() && (
               <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/50 border border-slate-800 rounded-md text-[11px] font-mono">

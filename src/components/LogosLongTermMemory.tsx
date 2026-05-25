@@ -72,6 +72,9 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
 
     setMemories(initialMems);
     localStorage.setItem("logos_longterm_memory", JSON.stringify(initialMems));
+    
+    const initialDirectives = initialMems.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
+    onInjectMemoryDirectives(initialDirectives);
 
     const verifyDatabaseDiskState = async () => {
       try {
@@ -135,37 +138,49 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
     e.preventDefault();
     if (!newRoot.trim() || !newInsight.trim()) return;
 
-    if (!auth.currentUser) {
-      setStatusMsg({ type: "error", text: "Firebase Authentication required to compile." });
-      return;
-    }
-
     const key = "mem-" + Date.now();
     const nNode: MemoryNode = {
       key,
       root: newRoot.trim(),
       insight: newInsight.trim(),
       timestamp: new Date().toISOString(),
-      ownerId: auth.currentUser.uid
+      ownerId: auth.currentUser?.uid
     };
     
-    try {
-      await setDoc(doc(db, "memories", key), nNode);
-      setNewRoot("");
-      setNewInsight("");
-      setStatusMsg({ type: "success", text: `Memory token for '${nNode.root}' merged into cognitive memory bank.` });
-    } catch(err) {
-      setStatusMsg({ type: "error", text: "Failed to persist to Firestore." });
-      handleFirestoreError(err, OperationType.CREATE, `memories/${key}`);
+    const updatedMemories = [...memories, nNode];
+    setMemories(updatedMemories);
+    localStorage.setItem("logos_longterm_memory", JSON.stringify(updatedMemories));
+    
+    const directives = updatedMemories.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
+    onInjectMemoryDirectives(directives);
+
+    setNewRoot("");
+    setNewInsight("");
+    setStatusMsg({ type: "success", text: `Memory token for '${nNode.root}' merged into cognitive memory bank.` });
+
+    if (auth.currentUser) {
+      try {
+        await setDoc(doc(db, "memories", key), nNode);
+      } catch(err) {
+        console.error("Failed to persist to Firestore.", err);
+      }
     }
   };
 
   const handleDelete = async (key: string) => {
-    try {
-       await deleteDoc(doc(db, "memories", key));
-    } catch(err) {
-       setStatusMsg({ type: "error", text: "Failed to delete target." });
-       handleFirestoreError(err, OperationType.DELETE, `memories/${key}`);
+    const updatedMemories = memories.filter(m => m.key !== key);
+    setMemories(updatedMemories);
+    localStorage.setItem("logos_longterm_memory", JSON.stringify(updatedMemories));
+    
+    const directives = updatedMemories.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
+    onInjectMemoryDirectives(directives);
+
+    if (auth.currentUser) {
+      try {
+         await deleteDoc(doc(db, "memories", key));
+      } catch(err) {
+         console.error("Failed to delete target.", err);
+      }
     }
   };
 
@@ -176,12 +191,11 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
       return;
     }
     
-    if (!auth.currentUser) return;
-
     let joinedCount = 0;
+    const newMemories = [...memories];
 
     for (const node of activeDeconstructionNodes) {
-      const exists = memories.find(m => m.root === node.root);
+      const exists = newMemories.find(m => m.root === node.root);
       if (!exists && node.learningLog) {
         const key = "mem-auto-" + Date.now() + Math.random().toString(36).substring(2, 5);
         const mem: MemoryNode = {
@@ -189,18 +203,28 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
           root: node.root,
           insight: `${node.desertMeaning} - ${node.learningLog.whatLearnt}`,
           timestamp: new Date().toISOString(),
-          ownerId: auth.currentUser.uid
+          ownerId: auth.currentUser?.uid
         };
-        try {
-           await setDoc(doc(db, "memories", key), mem);
-           joinedCount++;
-        } catch(e) {
-           console.error("Auto assimilation sync failed", e);
+        newMemories.push(mem);
+        joinedCount++;
+        
+        if (auth.currentUser) {
+           try {
+              await setDoc(doc(db, "memories", key), mem);
+           } catch(e) {
+              console.error("Auto assimilation sync failed", e);
+           }
         }
       }
     }
 
     if (joinedCount > 0) {
+      setMemories(newMemories);
+      localStorage.setItem("logos_longterm_memory", JSON.stringify(newMemories));
+      
+      const directives = newMemories.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
+      onInjectMemoryDirectives(directives);
+
       setStatusMsg({ type: "success", text: `${joinedCount} new cognitive insights compiled and permanently locked in memory.` });
     } else {
       setStatusMsg({ type: "success", text: "All analyzed structures are already fully synchronized inside memory ledger." });
@@ -209,16 +233,21 @@ export default function LogosLongTermMemory({ activeDeconstructionNodes, onInjec
 
   // Export memory to a physical JSON backup file for user download
   const saveAndApplyMemories = async (mems: MemoryNode[]) => {
-    if (!auth.currentUser) return;
-    try {
-      for (const m of mems) {
-        m.ownerId = auth.currentUser.uid;
-        await setDoc(doc(db, "memories", m.key), m);
+    setMemories(mems);
+    localStorage.setItem("logos_longterm_memory", JSON.stringify(mems));
+    
+    const directives = mems.map(m => `Physical memory anchor for root [${m.root}]: "${m.insight}"`);
+    onInjectMemoryDirectives(directives);
+
+    if (auth.currentUser) {
+      try {
+        for (const m of mems) {
+          m.ownerId = auth.currentUser.uid;
+          await setDoc(doc(db, "memories", m.key), m);
+        }
+      } catch(e) {
+        console.error("Bulk memory sync error", e);
       }
-      setMemories(mems);
-      localStorage.setItem("logos_longterm_memory", JSON.stringify(mems));
-    } catch(e) {
-      console.error("Bulk memory sync error", e);
     }
   };
 
