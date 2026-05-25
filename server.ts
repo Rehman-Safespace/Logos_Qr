@@ -13,7 +13,7 @@ const PORT = 3000;
 app.use(express.json({ limit: "20mb" }));
 
 // Administrative Authorization Password limit
-let masterPasscode = process.env.ADMIN_SECURE_PASSCODE || "LOGOS-9";
+let masterPasscode = process.env.ADMIN_SECURE_PASSCODE || "SECURE_OVERRIDE_KEY_NOT_SET";
 // In-Memory state of Directives (can be edited dynamically in live sessions)
 let currentDirectives = {
   arabicDefinition: "The functional physical property meaning 'Structural Transparency, High-Resolution Distinction, and Absolute Alignment with Material Reality'. Whenever a concept is 'Arabized', we strip away dogmatic or historical layers and align it strictly with physical, material, or thermodynamic truth.",
@@ -246,6 +246,16 @@ app.put("/api/documents/:id", (req, res) => {
   referenceFiles[docIndex].content = content;
   saveReferenceFilesToDisk();
   res.json({ success: true, document: { id: referenceFiles[docIndex].id, name: referenceFiles[docIndex].name, size: referenceFiles[docIndex].content.length, wordCount: referenceFiles[docIndex].content.split(/\s+/).length } });
+});
+
+// 6. POST Verify Passcode
+app.post("/api/admin/verify", (req, res) => {
+  const { passcode } = req.body;
+  if (passcode === masterPasscode) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: "Invalid passcode" });
+  }
 });
 
 // GET automated engine diagnosis report and save to reference list as physical tracker file

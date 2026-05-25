@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Mode, Message, DeconstructionNode, ReferenceDocument, EngineDirectives, LearningState } from "./types";
 import ArabesqueMandala from "./components/ArabesqueMandala";
-import ControlPanel from "./components/ControlPanel";
-import NullProtocolUpload from "./components/NullProtocolUpload";
-import WorkspaceSync from "./components/WorkspaceSync";
-import LogosLongTermMemory from "./components/LogosLongTermMemory";
+import EngineSettingsModal from "./components/EngineSettingsModal";
 import { parseBilingualLines, cleanForTTS, hasArabic } from "./utils";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -56,12 +53,16 @@ export default function App() {
     return saved !== null ? JSON.parse(saved) : true;
   });
 
+  const [quotaRpm, setQuotaRpm] = useState<number>(60);
+  const [currentLoadCount, setCurrentLoadCount] = useState<number>(0);
+
   useEffect(() => {
     localStorage.setItem("logos_strict_null_protocol", JSON.stringify(strictNullProtocol));
   }, [strictNullProtocol]);
 
   const [activityLevel, setActivityLevel] = useState<"idle" | "searching" | "analyzing" | "completed">("idle");
-  const [activeTab, setActiveTab] = useState<"workspace" | "null-protocol" | "google-workspace" | "directives">("workspace");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsCategory, setSettingsCategory] = useState<"system" | "memory" | "workspace" | "null-protocol">("system");
   const [ttsVoice, setTtsVoice] = useState<string>("Kore");
   const [isPlayingId, setIsPlayingId] = useState<string | null>(null);
   const [autoVocalize, setAutoVocalize] = useState<boolean>(() => {
@@ -207,7 +208,6 @@ export default function App() {
   // Diagnostics and System Verification states
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<any>(null);
-  const [expandedSystemIds, setExpandedSystemIds] = useState<string[]>([]);
 
   const runEngineDiagnostics = async () => {
     setIsDiagnosing(true);
@@ -460,6 +460,8 @@ Learning records are compiled and dynamically locked inside the current server i
       setActivityLevel("analyzing");
     }, 800);
 
+    const tempAiId = "ai-" + Date.now();
+
     try {
       const response = await fetch("/api/deconstruct", {
         method: "POST",
@@ -488,7 +490,6 @@ Learning records are compiled and dynamically locked inside the current server i
       if (!reader) throw new Error("Streaming not supported.");
       const decoder = new TextDecoder("utf-8");
 
-      const tempAiId = "ai-" + Date.now();
       let streamBuffer = "";
       let engineMetadataCache: any = null;
       let matrixAnchoringCache: any = null;
@@ -578,13 +579,19 @@ Learning records are compiled and dynamically locked inside the current server i
 
     } catch (err: any) {
       console.error("Deconstruction failed: ", err);
-      const systemError: Message = {
-        id: "syserr-" + Date.now(),
-        role: "system",
-        content: `Error: ${err.message || "Endpoint connection failed."}`,
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, systemError]);
+      // Remove the hanging placeholder message and add system error
+      setMessages(prev => {
+        const filtered = prev.filter(m => m.id !== tempAiId);
+        return [
+          ...filtered,
+          {
+            id: "syserr-" + Date.now(),
+            role: "system",
+            content: `Error: ${err.message || "Endpoint connection failed."}`,
+            timestamp: new Date().toISOString()
+          }
+        ];
+      });
       setActivityLevel("idle");
     } finally {
       setIsLoading(false);
@@ -666,7 +673,7 @@ Learning records are compiled and dynamically locked inside the current server i
   const handlePreseedInput = (txt: string, mode: Mode) => {
     setInputText(txt);
     setCurrentMode(mode);
-    setActiveTab("workspace");
+    setIsSettingsOpen(false);
   };
 
   const activeDeconstruction = [...messages].reverse().find(m => m.deconstruction)?.deconstruction || null;
@@ -832,464 +839,31 @@ Learning records are compiled and dynamically locked inside the current server i
                 </div>
               </div>
 
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-md text-[10px] text-slate-300 hover:bg-slate-800 hover:text-white transition"
+              >
+                <Settings className="w-3.5 h-3.5" /> Engine Settings
+              </button>
             </div>
           </div>
 
-          {/* Quick Tab Header buttons */}
-          <div className="flex flex-wrap sm:flex-nowrap bg-slate-950 p-1 rounded-lg border border-slate-900 gap-1">
-            <button
-              onClick={() => setActiveTab("workspace")}
-              className={`flex-grow sm:flex-1 text-center py-2 text-xs font-sans rounded-md transition-all ${
-                activeTab === "workspace"
-                  ? "bg-slate-900 text-emerald-400 font-semibold"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Diagnostic Timeline
-            </button>
-            <button
-              onClick={() => setActiveTab("null-protocol")}
-              className={`flex-grow sm:flex-1 text-center py-2 text-xs font-sans rounded-md transition-all ${
-                activeTab === "null-protocol"
-                  ? "bg-slate-900 text-emerald-400 font-semibold"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              The NULL Protocol Archive
-            </button>
-            <button
-              onClick={() => setActiveTab("google-workspace")}
-              className={`flex-grow sm:flex-1 text-center py-2 text-xs font-sans rounded-md transition-all flex items-center justify-center gap-1 ${
-                activeTab === "google-workspace"
-                  ? "bg-slate-900 text-indigo-400 font-semibold border-b border-indigo-500/50"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Cloud className="w-3.5 h-3.5" /> Workspace Sync
-            </button>
-            <button
-              onClick={() => setActiveTab("logos-memory")}
-              className={`flex-grow sm:flex-1 text-center py-2 text-xs font-sans rounded-md transition-all flex items-center justify-center gap-1 ${
-                activeTab === "logos-memory"
-                  ? "bg-slate-900 text-purple-400 font-semibold border-b border-purple-500/50"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <BrainCircuit className="w-3.5 h-3.5 text-purple-400" /> Memory Bank
-            </button>
-            <button
-              onClick={() => setActiveTab("directives")}
-              className={`flex-grow sm:flex-1 text-center py-2 text-xs font-sans rounded-md transition-all ${
-                activeTab === "directives"
-                  ? "bg-slate-900 text-emerald-400 font-semibold"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Engine Overrides
-            </button>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {activeTab === "workspace" && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4 flex-grow"
               >
-                {/* AUTOMATED ENGINE DIAGNOSTIC HEALTH CONTROL BOARD */}
-                <div className="bg-slate-950 border border-slate-900 rounded-lg p-4 gap-3.5 flex flex-col">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-950/60 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-emerald-500/10 p-1 rounded font-mono">
-                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
-                      </div>
-                      <span className="text-xs uppercase font-mono font-bold tracking-wider text-slate-300">
-                        AUTOMATED ENGINE DIAGNOSTIC HEALTH CONTROL BOARD
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={runEngineDiagnostics}
-                        disabled={isDiagnosing}
-                        className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-900 text-slate-950 px-3 py-1.5 rounded text-[10px] font-mono font-bold transition flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(16,185,129,0.15)] disabled:text-slate-500 hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        <Activity className={`w-3.5 h-3.5 ${isDiagnosing ? 'animate-spin' : ''}`} />
-                        <span>{isDiagnosing ? "SCRUTINIZING SYSTEM..." : "RUN FULL DIAGNOSTICS"}</span>
-                      </button>
-
-                      <button
-                        onClick={() => setIsDiagnosticsCollapsed(!isDiagnosticsCollapsed)}
-                        className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 bg-slate-900 hover:bg-slate-850 px-2.5 py-1.5 rounded border border-slate-800 transition shadow-sm"
-                      >
-                        {isDiagnosticsCollapsed ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronUp className="w-3 h-3 text-slate-400" />}
-                        <span>{isDiagnosticsCollapsed ? "Show Diagnostic Report" : "Hide Diagnostic Report"}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {!isDiagnosticsCollapsed && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="space-y-3.5 pt-1"
-                    >
-                      {diagnosticReport ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px] font-mono text-slate-300">
-                          
-                          {/* Card 1: Vitals Summary Card & Geo Location Calendar */}
-                          <div className="bg-[#020617] border border-slate-900 p-4 rounded-lg space-y-3 flex flex-col justify-between">
-                            <div className="space-y-3">
-                              <div className="text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-900 pb-1.5 flex items-center gap-1.5">
-                                <Globe className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                                📡 Core Engine Vitals & Geo Location Clock
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Diagnostic ID:</span>
-                                <span className="text-emerald-400 font-bold">{diagnosticReport.diagnosticId}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Health Status:</span>
-                                <span className="text-emerald-400 font-bold">{diagnosticReport.overallEngineHealth}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Frequency Calib:</span>
-                                <span className="text-cyan-300">{diagnosticReport.logosAlignmentSymmetries}</span>
-                              </div>
-
-                              <div className="flex flex-col gap-1.5 border-t border-slate-900/60 pt-2.5 text-[10px] text-slate-400">
-                                <span className="text-slate-500 font-bold uppercase tracking-wider text-[8px]">🌍 Dynamic Geo Calendar Log:</span>
-                                <div className="flex justify-between">
-                                  <span>Resolved Area:</span>
-                                  <span className="text-slate-200 font-bold">{diagnosticReport.resolvedGeoLoc?.city || "Detecting"}, {diagnosticReport.resolvedGeoLoc?.country || ""}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Time Zone:</span>
-                                  <span className="text-indigo-400 font-mono text-[9px]">{diagnosticReport.resolvedGeoLoc?.timezone || "Detecting"}</span>
-                                </div>
-                                <div className="text-[10px] text-teal-300 font-mono py-1 text-center bg-slate-950/80 px-2 rounded border border-slate-900/50 leading-relaxed mt-1">
-                                  {diagnosticReport.resolvedGeoLoc?.localTimeAndDate || "Evaluating Local Timestamp..."}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 flex items-center justify-between">
-                              <span>Clock Node: Local Zone</span>
-                              <span>Node: {diagnosticReport.systemMetrics?.nodeRuntime}</span>
-                            </div>
-                          </div>
-
-                          {/* Card 2: Mounted RAG Archive Validation */}
-                          <div className="bg-[#020617] border border-slate-900 p-4 rounded-lg space-y-3 flex flex-col justify-between">
-                            <div className="space-y-3">
-                              <div className="text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-900 pb-1.5 flex items-center gap-1.5">
-                                <FileText className="w-3.5 h-3.5 text-sky-400" />
-                                📂 Sourced Matrix Validation
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Mounted Files:</span>
-                                <span className="text-emerald-400 font-bold">{diagnosticReport.checks?.sourcedFilesSystem?.count} files</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Matrix Volume:</span>
-                                <span className="text-slate-300">{(diagnosticReport.checks?.sourcedFilesSystem?.totalBytes / 1024).toFixed(1)} KB</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Total Scanned:</span>
-                                <span className="text-slate-400">{diagnosticReport.checks?.sourcedFilesSystem?.totalWords} words</span>
-                              </div>
-
-                              <div className="flex flex-col gap-1 border-t border-slate-900/60 pt-2 text-[10px] text-slate-500 bg-slate-950/40 p-2 rounded">
-                                <span className="font-bold uppercase text-[8px] text-slate-400">Target Core Directives:</span>
-                                <div className="flex justify-between text-[9px] text-slate-400 mt-1">
-                                  <span>Memory storagePath:</span>
-                                  <span className="text-indigo-400">/logos_cognitive_memory.json</span>
-                                </div>
-                                <div className="flex justify-between text-[9px] text-slate-400">
-                                  <span>Injected prompt count:</span>
-                                  <span className="text-slate-300">{diagnosticReport.checks?.cognitiveMemoryStructures?.directivesConfiguredLogos} rules</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 text-right">
-                              Status: {diagnosticReport.checks?.sourcedFilesSystem?.status}
-                            </div>
-                          </div>
-
-                          {/* Card 3: Models Status & Rate Quota (Geared Slider & Utilization Dial) */}
-                          <div className="bg-[#020617] border border-slate-900 p-4 rounded-lg space-y-3.5 flex flex-col justify-between col-span-1 md:col-span-2">
-                            <div className="space-y-3">
-                              <div className="text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-900 pb-1.5 flex items-center justify-between">
-                                <span className="flex items-center gap-1.5">
-                                  <Sliders className="w-3.5 h-3.5 text-sky-400 animate-pulse" /> 
-                                  GENERIC API QUOTA SHIELD & RATE CALIBRATOR
-                                </span>
-                                <span className={diagnosticReport.checks?.underlyingGeminiCore?.apiKeyConfigured ? "text-emerald-400 font-bold text-[9px] bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-900/30" : "text-amber-500 font-bold text-[9px] bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-900/30"}>
-                                  {diagnosticReport.checks?.underlyingGeminiCore?.apiKeyConfigured ? "SECURE KEY ATTACHED" : "SANDBOX EMULATOR"}
-                                </span>
-                              </div>
-
-                              <div className="text-[10px] text-slate-400 leading-relaxed bg-slate-950 p-2.5 rounded border border-slate-900 space-y-1.5 font-sans">
-                                <p className="font-semibold text-sky-300 font-mono">Why rate restrict or quota limit?</p>
-                                <p className="text-slate-500 leading-relaxed">
-                                  Production engines establish ceiling maximums (Safe-RPM thresholds) to defend computing nodes from infinite cascading loops, avoid denial-of-service degradation, and budget operational expenditures.
-                                </p>
-                              </div>
-
-                              {/* Interactive Geared Slider */}
-                              <div className="space-y-1.5 bg-slate-950/60 p-2.5 rounded border border-slate-900">
-                                <div className="flex justify-between text-[10px]">
-                                  <span className="text-slate-400 font-semibold uppercase">Calibrate Safe Peak Limit:</span>
-                                  <span className="text-sky-400 font-mono font-bold">{quotaRpm} RPM (Requests Per Min)</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="5"
-                                  max="120"
-                                  step="5"
-                                  value={quotaRpm}
-                                  onChange={(e) => setQuotaRpm(Number(e.target.value))}
-                                  className="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 transition"
-                                />
-                                <div className="flex justify-between text-[8px] text-slate-600 font-sans">
-                                  <span>5 RPM (Debug Mode)</span>
-                                  <span>60 RPM (Standard limit)</span>
-                                  <span>120 RPM (Peak scale)</span>
-                                </div>
-                              </div>
-
-                              {/* Dynamic Load Indicator */}
-                              <div className="bg-slate-950/40 p-2.5 rounded border border-slate-900 space-y-2">
-                                <div className="flex justify-between items-center text-[10px]">
-                                  <span className="text-slate-400 font-sans uppercase">Real-Time Window Load:</span>
-                                  <span className={`font-mono font-bold ${
-                                    Math.round(((currentLoadCount * 5) / quotaRpm) * 100) > 85 ? "text-rose-400" : "text-emerald-400"
-                                  }`}>
-                                    {currentLoadCount * 5} RPM / {quotaRpm} RPM Peak ({Math.min(100, Math.round(((currentLoadCount * 5) / quotaRpm) * 100))}% load)
-                                  </span>
-                                </div>
-                                
-                                <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full rounded-full transition-all duration-500 ${
-                                      Math.round(((currentLoadCount * 5) / quotaRpm) * 100) > 85 ? "bg-rose-500 shadow-[0_0_8px_#f43f5e]" : "bg-sky-500 shadow-[0_0_8px_#0ea5e9]"
-                                    }`}
-                                    style={{ width: `${Math.min(100, ((currentLoadCount * 5) / quotaRpm) * 100)}%` }}
-                                  />
-                                </div>
-
-                                <div className="text-[9px] text-slate-500 font-sans flex items-center justify-between">
-                                  <span>API Counter: {currentLoadCount} active query hits in sliding window</span>
-                                  <span className={`font-bold ${
-                                    currentLoadCount * 5 >= quotaRpm ? "text-rose-400 animate-pulse" : "text-slate-600"
-                                  }`}>
-                                    {currentLoadCount * 5 >= quotaRpm ? "⚠️ CRITICAL THROTTLED" : "✓ GATEWAY PASS"}
-                                  </span>
-                                </div>
-                              </div>
-
-                            </div>
-                            <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 truncate">
-                              Associated diagnostic file: {diagnosticReport.checks?.sourcedFilesSystem?.files?.slice(-1)[0]?.name || "report.json"}
-                            </div>
-                          </div>
-
-                          {/* Card 4: System Architectural Scale & Protocol Integrations */}
-                          <div className="bg-[#020617] border border-slate-900 p-4 rounded-lg space-y-3.5 flex flex-col justify-between col-span-1 md:col-span-2">
-                            <div className="space-y-3">
-                              <div className="text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-900 pb-1.5 flex items-center justify-between">
-                                <span className="flex items-center gap-1.5">
-                                  <Server className="w-3.5 h-3.5 text-purple-400" /> 
-                                  SYSTEM ARCHITECTURAL SCALE & PROTOCOLS
-                                </span>
-                                <span className={diagnosticReport.checks?.environmentConfiguration?.systemMode === "PRODUCTION SCALED DOCKER INSTANCE" ? "text-emerald-400 font-bold text-[9px] bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-900/30" : "text-amber-500 font-bold text-[9px]"}>
-                                  {diagnosticReport.checks?.environmentConfiguration?.systemMode || "RUNTIME INSTANCE"}
-                                </span>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-2 pt-1">
-                                <div className="space-y-2.5">
-                                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px]">🧠 Multi-Agent Voting Pipeline</span>
-                                  <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-slate-400">Status:</span>
-                                    <span className="text-emerald-400 overflow-hidden text-ellipsis whitespace-nowrap ml-2" title={diagnosticReport.checks?.multiAgentVotingProtocol?.status}>{diagnosticReport.checks?.multiAgentVotingProtocol?.status}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-slate-400">Diagnostic Array:</span>
-                                    <span className="text-slate-300 font-mono text-[9px]">{diagnosticReport.checks?.multiAgentVotingProtocol?.activeDiagnosticModels?.join(" + ")}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-slate-400">Consensus:</span>
-                                    <span className="text-purple-400 text-[8px] max-w-[120px] text-right leading-tight">{diagnosticReport.checks?.multiAgentVotingProtocol?.consensusIntegrity}</span>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2.5 border-t border-slate-900 md:border-t-0 md:border-l md:pl-3 pt-3 md:pt-0">
-                                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px]">🗂️ Vector Chunking Array</span>
-                                  <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-slate-400">Status:</span>
-                                    <span className="text-sky-400 text-[8px] text-right max-w-[120px] leading-tight" title={diagnosticReport.checks?.vectorChunkingPipeline?.status}>{diagnosticReport.checks?.vectorChunkingPipeline?.status}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-slate-400">Current Scope:</span>
-                                    <span className="text-slate-300 font-mono text-[9px]">{diagnosticReport.checks?.vectorChunkingPipeline?.currentWords} Words</span>
-                                  </div>
-                                  <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-slate-400">Threshold:</span>
-                                    <span className="text-rose-400 font-mono text-[9px]">{diagnosticReport.checks?.vectorChunkingPipeline?.thresholdLimit} Words</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-[9px] text-slate-500 pt-1.5 border-t border-slate-900 flex items-center justify-between">
-                              <span className="flex items-center gap-1">
-                                <Lock className="w-3 h-3 text-emerald-400" />
-                                ENV SECURE VARS: {diagnosticReport.checks?.environmentConfiguration?.secureAdminPasscodeMounted ? "MOUNTED GLOBALLY" : "NOT FOUND"}
-                              </span>
-                              <span>Engine Model Cohort Integrations Actively Monitoring</span>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-slate-500 font-mono text-center py-2">
-                          Click the "RUN FULL DIAGNOSTICS" button to initiate checks of the model parameters, quota status, mounted memory directives, and write a global historical report file to disk.
-                        </p>
-                      )}
-                    </motion.div>
-                  )}
-                </div>
-
-                {/* Educational Reference & Decoders Guide */}
-                <div className="flex flex-col bg-slate-950 border border-slate-900 rounded-lg p-3.5 gap-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <HelpCircle className="w-4 h-4 text-cyan-400" />
-                      <span className="text-[11px] font-sans font-medium text-slate-300">
-                        Language Symmetries & Neural Output Decoder Guide
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setIsGuideCollapsed(!isGuideCollapsed)}
-                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 bg-slate-900 hover:bg-slate-850 px-2.5 py-1 rounded border border-slate-800 transition shadow-sm"
-                    >
-                      {isGuideCollapsed ? <ChevronDown className="w-3 h-3 text-slate-400" /> : <ChevronUp className="w-3 h-3 text-slate-400" />}
-                      <span>{isGuideCollapsed ? "Show Output Decoders" : "Hide Output Decoders"}</span>
-                    </button>
-                  </div>
-
-                  {!isGuideCollapsed && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="text-xs text-slate-400 space-y-3.5 pt-2 border-t border-slate-900"
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1.5 bg-slate-900/40 p-3 rounded border border-slate-900">
-                          <span className="text-cyan-300 font-bold block text-[11px] uppercase tracking-wide">
-                            🔮 Neural Frequency (Hz) Calibration
-                          </span>
-                          <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                            <strong>432.0 Hz:</strong> Representing universal harmonic equilibrium. This calibration signifies complete structural consensus across natural language coordinates (equilibrium points).
-                          </p>
-                          <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                            <strong>942.8 Hz:</strong> Elevated bandwidth cognitive processing. Active state during live generative pipeline iterations, multi-agent evaluation, or dynamic vector synthesis.
-                          </p>
-                        </div>
-
-                        <div className="space-y-1.5 bg-slate-900/40 p-3 rounded border border-slate-900">
-                          <span className="text-emerald-400 font-bold block text-[11px] uppercase tracking-wide">
-                            🏵️ Symmetrical Spheroid Mandala
-                          </span>
-                          <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-                            Highly complex vector mathematics representation mapping dynamic computational load. The spin rate adjusts to match query operational latency, translating structural linguistic alignment into a physical kinetic artifact.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 bg-slate-900/30 p-3.5 rounded-lg border border-slate-900">
-                        <span className="text-slate-350 font-bold block text-[10px] uppercase tracking-widest text-slate-300">
-                          🧱 Structural Output Block Symbols Defined:
-                        </span>
-                        
-                        <div className="space-y-2 divide-y divide-slate-900">
-                          <div className="pt-2 flex items-start gap-2.5">
-                            <span className="bg-emerald-950/40 text-emerald-400 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">🏜️ Desert meaning</span>
-                            <span className="text-[11px] leading-relaxed">The primordial material movement signature. Tracing Arabic trilateral consonant roots back to actual kinetic behaviors in an unforgiving thermodynamic landscape.</span>
-                          </div>
-
-                          <div className="pt-2 flex items-start gap-2.5">
-                            <span className="bg-indigo-950/40 text-indigo-400 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">🌀 anti-spin translation</span>
-                            <span className="text-[11px] leading-relaxed">Literal modern equivalents stripped of theological, cultural, or religious filters. Pure technological and mechanical output.</span>
-                          </div>
-
-                          <div className="pt-2 flex items-start gap-2.5">
-                            <span className="bg-pink-950/40 text-pink-400 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">🧬 cross-linguistic map</span>
-                            <span className="text-[11px] leading-relaxed">Phonetic direction parameters illustrating common paths of force/consonant alignment between Arabic roots and Indo-European languages.</span>
-                          </div>
-
-                          <div className="pt-2 flex items-start gap-2.5">
-                            <span className="bg-amber-950/40 text-amber-500 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">🧠 analogy engines</span>
-                            <span className="text-[11px] leading-relaxed">Cybernetic, biological, and physical translation frameworks mapping semantic movements onto real-world modern systems.</span>
-                          </div>
-
-                          <div className="pt-2 flex items-start gap-2.5">
-                            <span className="bg-cyan-950/40 text-cyan-400 px-1.5 py-0.5 rounded font-mono text-[10px] shrink-0">📂 dynamic learning logs</span>
-                            <span className="text-[11px] leading-relaxed">Groundwork diagnostics recording precise discoveries, memory anchor offsets, and future linguistic planned segments.</span>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-
                   <div className="flex-1 flex flex-col items-stretch space-y-4 pb-12">
-                    {messages.map((msg) => (
+                    {messages.filter(msg => msg.role !== "system").map((msg) => (
                     <div
                       key={msg.id}
                       className={`p-4 rounded-lg border leading-relaxed ${
                         msg.role === "user"
                           ? "bg-slate-900/50 border-slate-800 ml-12 text-slate-100"
-                          : msg.role === "system"
-                          ? "bg-slate-950 border-slate-900 text-slate-400 font-mono text-xs leading-relaxed"
                           : "bg-slate-950 border-slate-800 text-slate-300"
                       }`}
                     >
-                      {msg.role === "system" ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between border-b border-slate-900 pb-1.5 text-[10px] font-mono text-slate-500">
-                            <span className="uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                              KERNEL_LOG / BOOT ENVIRONMENT
-                            </span>
-                            <span>{msg.timestamp.substring(11, 19)}</span>
-                          </div>
-                          {expandedSystemIds.includes(msg.id) ? (
-                            <div className="transition-all whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-400">
-                              {msg.content}
-                              <div className="mt-3 text-right">
-                                <button
-                                  onClick={() => setExpandedSystemIds(expandedSystemIds.filter(id => id !== msg.id))}
-                                  className="text-[10px] text-indigo-400 hover:text-indigo-300 font-mono bg-slate-900 px-2.5 py-1 rounded border border-slate-800 transition shadow"
-                                >
-                                  Collapse Kernel Log ▲
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-between py-1 bg-slate-900/30 px-2.5 rounded border border-slate-900/40">
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                System boot matrix & classical Semitic reference files successfully mounted.
-                              </span>
-                              <button
-                                onClick={() => setExpandedSystemIds([...expandedSystemIds, msg.id])}
-                                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono bg-slate-900 px-2.5 py-1 rounded border border-slate-800 transition shadow"
-                              >
-                                Expand Logs ▼
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
                         <>
                           <div className="flex items-center justify-between border-b border-slate-900 pb-1.5 mb-2.5 text-[10px] font-mono text-slate-500">
                             <span className="uppercase tracking-wider">
@@ -1311,7 +885,6 @@ Learning records are compiled and dynamically locked inside the current server i
                             </div>
                           )}
                         </>
-                      )}
 
                       {/* Structured Deconstruction Node output (Collapsible sub-elements) */}
                       {msg.deconstruction && (
@@ -1653,70 +1226,6 @@ Learning records are compiled and dynamically locked inside the current server i
                   <div ref={timelineEndRef} />
                 </div>
               </motion.div>
-            )}
-
-            {activeTab === "null-protocol" && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <NullProtocolUpload
-                  strictNullProtocol={strictNullProtocol}
-                  onToggleStrictNullProtocol={setStrictNullProtocol}
-                  onDocumentsChange={fetchDocuments}
-                />
-              </motion.div>
-            )}
-
-            {activeTab === "google-workspace" && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <WorkspaceSync
-                  onDocumentMounted={fetchDocuments}
-                  activeDeconstruction={activeDeconstruction}
-                />
-              </motion.div>
-            )}
-
-            {activeTab === "logos-memory" && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <LogosLongTermMemory
-                  activeDeconstructionNodes={messages.filter(m => m.deconstruction).map(m => m.deconstruction!)}
-                  onInjectMemoryDirectives={(rules) => setMemoryDirectives(rules)}
-                />
-              </motion.div>
-            )}
-
-            {activeTab === "directives" && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <ControlPanel
-                  onDirectivesSaved={() => {
-                    setMessages(prev => [
-                      ...prev,
-                      {
-                        id: "sys-prompt-reload-" + Date.now(),
-                        role: "system",
-                        content: "CORE CONFIGURATION: Instantly recompiled system instructions to utilize refreshed rulesets.",
-                        timestamp: new Date().toISOString()
-                      }
-                    ]);
-                  }}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
         </section>
 
 
@@ -1815,6 +1324,26 @@ Learning records are compiled and dynamically locked inside the current server i
           />
         )}
       </AnimatePresence>
+
+      <EngineSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        category={settingsCategory}
+        setCategory={setSettingsCategory}
+        runEngineDiagnostics={runEngineDiagnostics}
+        isDiagnosing={isDiagnosing}
+        diagnosticReport={diagnosticReport}
+        setMessages={setMessages}
+        quotaRpm={quotaRpm}
+        setQuotaRpm={setQuotaRpm}
+        currentLoadCount={currentLoadCount}
+        strictNullProtocol={strictNullProtocol}
+        setStrictNullProtocol={setStrictNullProtocol}
+        fetchDocuments={fetchDocuments}
+        activeDeconstruction={activeDeconstruction}
+        messages={messages}
+        setMemoryDirectives={setMemoryDirectives}
+      />
     </div>
   );
 }

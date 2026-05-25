@@ -1,6 +1,6 @@
 # LOGOS_0o2 COGNITIVE LINGUISTIC ENGINE: ARCHITECTURE & BACKUP SPECIFICATION
 > **Secure Documentation of Structural Linguistic Deconstruction Pipelines**  
-> **Composed on: 2026-05-23T20:58:32Z**  
+> **Composed on: 2026-05-25T18:31:08Z**  
 > **Master Authorization Claim:** `safespace.ch@gmail.com`  
 > **Active Target Platform:** Google AI Studio (Vite + Express Full-Stack Workspace Container)  
 
@@ -37,6 +37,7 @@ The workspace is maintained under a full-stack, single-container deployment conf
     └── components/              // Modular Component Sandbox
         ├── ArabesqueMandala.tsx // Animated fractal loading & load load metrics visualizer
         ├── ControlPanel.tsx     // Administrative settings & custom prompt injector
+        ├── EngineSettingsModal.tsx // Unified categorized modal for system configuration
         ├── NullProtocolUpload.tsx // Reference documents indexing & matrix dashboard
         ├── WorkspaceSync.tsx    // Secure Google Doc compiler & Keeps synchronizer
         └── LogosLongTermMemory.tsx // Cognitive learning logs & dual-sync storage manager
@@ -63,6 +64,9 @@ The client interface is styled with a high-contrast Slate/Obsidian dark-mode lay
    - Includes real-time listing, searching, and eviction (deletion) of cognitive keep notes synchronized under the local project state.
  5. **Null Protocol Vector Matrix Editing (`NullProtocolUpload.tsx`):**
    - Directly allows users to upload, mount, edit, read, and delete RAG indices natively inside the interface via direct API puts (`/api/documents/:id`) updating dynamically to the disk array `logos_reference_files.json`.
+ 6. **Central Engine Settings (`EngineSettingsModal.tsx`):**
+   - A unified modular sidebar modal separating engine functions into categorized tabs: "System & Overrides", "Memory Bank", "Workspace Sync", and "Null Protocol Files".
+   - Features the **Automated Engine Diagnostic Health Control Board**, allowing execution of full diagnostic scans on system metrics, quota, node latency, and RAG file configurations. Contains interactive load sliders to calibrate API Quota ceilings (Safe-RPM thresholds) directly from the interface.
 
 ### 3.2 The Backend Layer (`server.ts` & Express)
 The custom NodeJS server runs direct full-stack routing and proxies all API keys to remain safe from browser inspector tools.
@@ -291,7 +295,7 @@ The HTML head has been enriched with Apple web-app standalone modifiers and brow
 
 For Production Scale: Rather than hardcoding secure values in the TypeScript file, the engine leverages secure environment variables. For example, the `ADMIN_SECURE_PASSCODE` is configured globally:
 - **Private Environment Variables**: Set via the Settings menu of the environment container (e.g., Google Cloud Run or AI Studio settings).
-- **Dynamic Scalability**: Passwords and other secure keys can be changed dynamically anytime via the environment console without needing to touch or rebuild the source code, preventing security breaches during scaling and production deployments.
+- **Dynamic Scalability**: Passwords and other secure keys can be changed dynamically anytime via the environment console without needing to touch or rebuild the source code. The default hardcoded fallback is now `SECURE_OVERRIDE_KEY_NOT_SET` forcing the administrator to actively set the secure key in the environment variables, preventing security breaches during scaling and production deployments.
 
 ---
 

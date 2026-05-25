@@ -23,7 +23,7 @@ export default function ControlPanel({ onDirectivesSaved }: ControlPanelProps) {
       
       // Auto-unlock if user email matches developer or admin access (e.g. safespace.ch@gmail.com)
       if (user && user.email === "safespace.ch@gmail.com") {
-        setPasscode("LOGOS-9"); // Set fallback payload passcode for server compatibility
+        setPasscode("SECURE_OVERRIDE_KEY_NOT_SET"); // Set fallback payload passcode for server compatibility
         setIsAuthenticated(true);
         setFeedback({ 
           type: "success", 
@@ -71,15 +71,25 @@ export default function ControlPanel({ onDirectivesSaved }: ControlPanelProps) {
   }, []);
 
   // Handle Passcode Unlock Challenge
-  const handleUnlock = (e: React.FormEvent) => {
+  const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode.trim() === "LOGOS-9") {
-      setIsAuthenticated(true);
-      setFeedback({ type: "success", message: "System Security Clearance level 0o2 Granted." });
-      setTimeout(() => setFeedback(null), 3000);
-    } else {
-      setFeedback({ type: "error", message: "Error0109: Security signature invalid or denied." });
-      setIsAuthenticated(false);
+    try {
+      const res = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode: passcode.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsAuthenticated(true);
+        setFeedback({ type: "success", message: "System Security Clearance level 0o2 Granted." });
+        setTimeout(() => setFeedback(null), 3000);
+      } else {
+        setFeedback({ type: "error", message: "Error0109: Security signature invalid or denied." });
+        setIsAuthenticated(false);
+      }
+    } catch(err) {
+      setFeedback({ type: "error", message: "Network error validating passcode." });
     }
   };
 
